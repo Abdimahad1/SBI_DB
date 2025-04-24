@@ -7,28 +7,18 @@ exports.signup = async (req, res) => {
   const { name, phone, email, password, role } = req.body;
 
   try {
-    // Check for existing email
     const existingEmail = await User.findOne({ email });
     if (existingEmail) {
       return res.status(400).json({ message: "Email already in use" });
     }
 
-    // Check for existing phone number
     const existingPhone = await User.findOne({ phone });
     if (existingPhone) {
       return res.status(400).json({ message: "Phone number already in use" });
     }
 
-    // Hash the password first
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Check for existing hashed password
-    const existingPassword = await User.findOne({ password: hashedPassword });
-    if (existingPassword) {
-      return res.status(400).json({ message: "Please choose a different password" });
-    }
-
-    // Create new user
     const newUser = await User.create({
       name,
       phone,
@@ -43,7 +33,7 @@ exports.signup = async (req, res) => {
   }
 };
 
-// Login an existing user (with role check)
+// Login an existing user
 exports.login = async (req, res) => {
   const { email, password, role } = req.body;
 
@@ -69,6 +59,7 @@ exports.login = async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
+        email: user.email,
         role: user.role
       }
     });
@@ -108,16 +99,42 @@ exports.updateUser = async (req, res) => {
   }
 };
 
-// PATCH: Partially update user
+// PATCH: Partially update user with secure password change
 exports.partialUpdateUser = async (req, res) => {
   try {
-    const updatedUser = await User.findByIdAndUpdate(
-      req.userId,
-      { $set: req.body },
-      { new: true }
-    );
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    res.json(updatedUser);
+    const { name, currentPassword, password, confirmPassword } = req.body;
+
+    // Update name if present
+    if (name) user.name = name;
+
+    // Handle password update
+    if (password || confirmPassword || currentPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ message: "Current password is required" });
+      }
+
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+
+      if (!password || !confirmPassword) {
+        return res.status(400).json({ message: "New and confirm password are required" });
+      }
+
+      if (password !== confirmPassword) {
+        return res.status(400).json({ message: "New passwords do not match" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      user.password = hashedPassword;
+    }
+
+    await user.save();
+    res.json({ message: "User updated successfully", name: user.name });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
