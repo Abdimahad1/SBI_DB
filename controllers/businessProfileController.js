@@ -11,11 +11,19 @@ exports.getProfile = async (req, res) => {
 
 exports.updateProfile = async (req, res) => {
   try {
+    const updateData = { ...req.body };
+
+    // If an image file is uploaded, add it to the update
+    if (req.file) {
+      updateData.logo = req.file.filename;
+    }
+
     const profile = await BusinessProfile.findOneAndUpdate(
       { user_id: req.userId },
-      { $set: req.body },
+      { $set: updateData },
       { new: true, upsert: true }
     );
+
     res.json(profile);
   } catch (err) {
     res.status(500).json({ message: err.message });

@@ -54,13 +54,15 @@ exports.login = async (req, res) => {
       { expiresIn: '1d' }
     );
 
+    // 🛠️ FIXED: Now include 'phone' inside the returned user data
     res.json({
       token,
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        phone: user.phone    // ✅ Added this line
       }
     });
   } catch (err) {

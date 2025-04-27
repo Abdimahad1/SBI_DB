@@ -5,14 +5,19 @@ const cors = require('cors');
 
 // Import Routes
 const authRoutes = require('./routes/authRoutes');
-const customerRoutes = require('./routes/customerRoutes');
-const orderRoutes = require('./routes/orderRoutes');
 const businessProfileRoutes = require('./routes/businessProfileRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const productRoutes = require('./routes/productRoutes'); 
-const businessOverviewRoutes = require('./routes/businessOverviewRoutes');
-const businessGrowthRoutes = require('./routes/businessGrowthRoutes');
 const goalRoutes = require('./routes/goalRoutes');
+const investmentRoutes = require('./routes/investmentRoutes');
+const sellBusinessRoutes = require('./routes/sellBusinessRoutes');
+const customerViewRoutes = require('./routes/customerViewRoutes');
+const overviewRoutes = require('./routes/overviewRoutes'); 
+
+
+
+
+
 
 // Load environment variables
 dotenv.config();
@@ -28,14 +33,16 @@ app.use(express.json());
 
 // Route Definitions
 app.use('/api/auth', authRoutes);
-app.use('/api/customers', customerRoutes);
-app.use('/api/orders', orderRoutes);
 app.use('/api/profile', businessProfileRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/products', productRoutes); 
-app.use('/api/overview', businessOverviewRoutes);
-app.use('/api/growth', businessGrowthRoutes);
 app.use('/api/goals', goalRoutes);
+app.use('/api/investments', investmentRoutes);
+app.use('/api/sell-business', sellBusinessRoutes);
+app.use('/uploads', express.static('uploads'));
+app.use('/api/customer-view', customerViewRoutes);
+app.use('/api/overview', overviewRoutes);
+
 
 // Start Server
 const PORT = process.env.PORT || 5000;
