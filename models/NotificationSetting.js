@@ -5,7 +5,7 @@ const NotificationSettingSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    unique: true
+    unique: true,
   },
   email_alerts: { type: Boolean, default: true },
   in_app: { type: Boolean, default: true },

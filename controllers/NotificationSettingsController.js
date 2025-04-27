@@ -1,5 +1,6 @@
 const NotificationSetting = require('../models/NotificationSetting');
 
+// Get current notification settings
 exports.getSettings = async (req, res) => {
   try {
     const settings = await NotificationSetting.findOne({ user_id: req.userId });
@@ -9,6 +10,7 @@ exports.getSettings = async (req, res) => {
   }
 };
 
+// Update notification settings
 exports.updateSettings = async (req, res) => {
   try {
     const updated = await NotificationSetting.findOneAndUpdate(
@@ -21,4 +23,3 @@ exports.updateSettings = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-

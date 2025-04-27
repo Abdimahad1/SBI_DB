@@ -6,17 +6,16 @@ const cors = require('cors');
 // Import Routes
 const authRoutes = require('./routes/authRoutes');
 const businessProfileRoutes = require('./routes/businessProfileRoutes');
-const notificationRoutes = require('./routes/notificationRoutes');
+const notificationRoutes = require('./routes/NotificationsRoute');
 const productRoutes = require('./routes/productRoutes'); 
 const goalRoutes = require('./routes/goalRoutes');
 const investmentRoutes = require('./routes/investmentRoutes');
 const sellBusinessRoutes = require('./routes/sellBusinessRoutes');
 const customerViewRoutes = require('./routes/customerViewRoutes');
-const overviewRoutes = require('./routes/overviewRoutes'); 
-
-
-
-
+const overviewRoutes = require('./routes/overviewRoutes');
+const locationRoutes = require('./routes/locationRoutes'); 
+const notificationSettingsRoutes = require('./routes/NotificationSettingsRoute');
+const notificationsRoutes = require('./routes/NotificationsRoute');
 
 
 // Load environment variables
@@ -42,7 +41,9 @@ app.use('/api/sell-business', sellBusinessRoutes);
 app.use('/uploads', express.static('uploads'));
 app.use('/api/customer-view', customerViewRoutes);
 app.use('/api/overview', overviewRoutes);
-
+app.use('/api/locations', locationRoutes); 
+app.use('/api/notification-settings', notificationSettingsRoutes);    // For settings (sound, in-app, email)
+app.use('/api/real-notifications', notificationsRoutes); 
 
 // Start Server
 const PORT = process.env.PORT || 5000;
