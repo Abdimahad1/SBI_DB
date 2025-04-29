@@ -1,19 +1,32 @@
 const Notification = require('../models/Notification');
 
-// Create a new notification
+// ✅ Create a new notification with duplicate check
 exports.createNotification = async (req, res) => {
   try {
+    const { title, message } = req.body;
+    const user_id = req.userId;
+
+    // ✅ Check if a notification with same title and message already exists for the user
+    const existingNotification = await Notification.findOne({ user_id, title, message });
+
+    if (existingNotification) {
+      return res.status(200).json({ message: 'Notification already exists' }); // ✅ Skip creating
+    }
+
+    // ✅ Create new notification if not exists
     const notification = await Notification.create({
-      ...req.body,
-      user_id: req.userId
+      title,
+      message,
+      user_id
     });
+
     res.status(201).json(notification);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// Get all notifications for user
+// ✅ Get all notifications for user
 exports.getUserNotifications = async (req, res) => {
   try {
     const notifications = await Notification.find({ user_id: req.userId }).sort({ createdAt: -1 });
@@ -23,7 +36,7 @@ exports.getUserNotifications = async (req, res) => {
   }
 };
 
-// Mark notification as read
+// ✅ Mark notification as read
 exports.markAsRead = async (req, res) => {
   try {
     const updated = await Notification.findOneAndUpdate(
@@ -38,7 +51,7 @@ exports.markAsRead = async (req, res) => {
   }
 };
 
-// Delete a notification
+// ✅ Delete a notification
 exports.deleteNotification = async (req, res) => {
   try {
     await Notification.deleteOne({ _id: req.params.id, user_id: req.userId });
