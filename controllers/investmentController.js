@@ -20,6 +20,25 @@ exports.getInvestments = async (req, res) => {
   }
 };
 
+// GET ALL investments (for investors)
+exports.getAllInvestments = async (req, res) => {
+  try {
+    const investments = await Investment.find()
+      .populate('user_id', 'name email') // Include basic user info
+      .sort({ createdAt: -1 }); // Newest first
+    
+    // Add calculated fields if needed
+    const investmentsWithMeta = investments.map(investment => ({
+      ...investment._doc,
+      progress: (investment.currentContribution / investment.goalAmount) * 100
+    }));
+
+    res.json(investmentsWithMeta);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // UPDATE
 exports.updateInvestment = async (req, res) => {
   try {

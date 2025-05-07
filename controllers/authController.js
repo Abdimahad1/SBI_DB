@@ -35,14 +35,17 @@ exports.signup = async (req, res) => {
 
 // Login an existing user
 exports.login = async (req, res) => {
-  const { email, password, role } = req.body;
+  const { email, password, role } = req.body; // ✅ frontend must send role
 
   try {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    // ✅ Ensure role matches
     if (user.role !== role) {
-      return res.status(403).json({ message: "Role does not match" });
+      return res.status(403).json({
+        message: `Role mismatch! Please select the correct role to log in.`
+      });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -54,7 +57,6 @@ exports.login = async (req, res) => {
       { expiresIn: '1d' }
     );
 
-    // 🛠️ FIXED: Now include 'phone' inside the returned user data
     res.json({
       token,
       user: {
@@ -62,7 +64,7 @@ exports.login = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        phone: user.phone    // ✅ Added this line
+        phone: user.phone
       }
     });
   } catch (err) {
@@ -109,10 +111,8 @@ exports.partialUpdateUser = async (req, res) => {
 
     const { name, currentPassword, password, confirmPassword } = req.body;
 
-    // Update name if present
     if (name) user.name = name;
 
-    // Handle password update
     if (password || confirmPassword || currentPassword) {
       if (!currentPassword) {
         return res.status(400).json({ message: "Current password is required" });
