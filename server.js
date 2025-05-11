@@ -16,7 +16,8 @@ const overviewRoutes = require('./routes/overviewRoutes');
 const locationRoutes = require('./routes/locationRoutes'); 
 const notificationSettingsRoutes = require('./routes/NotificationSettingsRoute');
 const notificationsRoutes = require('./routes/NotificationsRoute');
-
+const predictionFieldsRoutes = require('./routes/predictionFieldsRoutes'); 
+const interestedInvestorsRoutes = require('./routes/interestedInvestors');
 
 // Load environment variables
 dotenv.config();
@@ -44,6 +45,8 @@ app.use('/api/overview', overviewRoutes);
 app.use('/api/locations', locationRoutes); 
 app.use('/api/notification-settings', notificationSettingsRoutes);    // For settings (sound, in-app, email)
 app.use('/api/real-notifications', notificationsRoutes); 
+app.use('/api/prediction-fields', predictionFieldsRoutes);
+app.use('/api/investors-interested', interestedInvestorsRoutes);
 
 // Start Server
 const PORT = process.env.PORT || 5000;

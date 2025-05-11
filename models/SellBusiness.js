@@ -7,7 +7,6 @@ const SellBusinessSchema = new mongoose.Schema({
     required: true
   },
   business: { type: String, required: true },
-  industry: { type: String, required: true },
   price: { type: Number, required: true },
   reason: { type: String, required: true },
   contact: { type: String, required: true },
