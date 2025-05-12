@@ -19,4 +19,5 @@ router.delete('/:id', authMiddleware, deleteInvestment);
 // Investor-specific route
 router.get('/all', authMiddleware, getAllInvestments);
 
+
 module.exports = router;
