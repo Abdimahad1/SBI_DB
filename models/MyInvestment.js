@@ -11,6 +11,11 @@ const MyInvestmentSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  investment_id: {
+    type: String, // ✅ This is important to connect with notifications and status updates
+    required: true,
+    unique: true // Optional but helpful to prevent duplicates
+  },
   title: String,
   image: String,
   purpose: String,

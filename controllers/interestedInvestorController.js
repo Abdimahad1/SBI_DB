@@ -4,9 +4,8 @@ const InterestedInvestor = require('../models/InterestedInvestor');
 exports.saveInvestor = async (req, res) => {
   try {
     const { investment_id, name, email, message, image } = req.body;
-    const user_id = req.userId; // From auth middleware
+    const user_id = req.userId;
 
-    // Validate required fields
     if (!investment_id) {
       return res.status(400).json({
         message: 'Missing required field: investment_id',
@@ -21,8 +20,7 @@ exports.saveInvestor = async (req, res) => {
       name,
       email,
       message,
-      image,
-      status: 'pending'
+      image
     });
 
     res.status(201).json(newInvestor);
@@ -32,10 +30,10 @@ exports.saveInvestor = async (req, res) => {
   }
 };
 
-// GET all investors (returns all entries for now, you can add filtering later)
+// GET all investors
 exports.getInvestors = async (req, res) => {
   try {
-    const investors = await InterestedInvestor.find(); // No business_owner_id filter
+    const investors = await InterestedInvestor.find();
     res.json(investors);
   } catch (err) {
     console.error('❌ Failed to fetch investors:', err);
@@ -61,23 +59,16 @@ exports.deleteInvestor = async (req, res) => {
   }
 };
 
-// UPDATE investor status
-exports.updateInvestorStatus = async (req, res) => {
+// GET investor by ID
+exports.getInvestorById = async (req, res) => {
   try {
-    const { status } = req.body;
-    const investor = await InterestedInvestor.findOneAndUpdate(
-      { _id: req.params.id },
-      { status },
-      { new: true }
-    );
-
+    const investor = await InterestedInvestor.findById(req.params.id);
     if (!investor) {
       return res.status(404).json({ message: 'Investor not found' });
     }
-
     res.json(investor);
   } catch (err) {
-    console.error('❌ Failed to update investor:', err);
+    console.error('❌ Failed to fetch investor:', err);
     res.status(500).json({ message: err.message });
   }
 };
