@@ -103,3 +103,24 @@ exports.updateStatusByInvestmentId = async (req, res) => {
       });
     }
   };
+
+  // Add this to your existing exports
+exports.getInvestmentById = async (req, res) => {
+  try {
+    const { investment_id } = req.query;
+    if (!investment_id) {
+      return res.status(400).json({ message: 'investment_id is required' });
+    }
+
+    const investment = await MyInvestment.findOne({ investment_id });
+    if (!investment) {
+      return res.status(404).json({ message: 'Investment not found' });
+    }
+
+    res.json([investment]); // Return as array for consistency with other endpoints
+  } catch (err) {
+    console.error('Get Investment Error:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
+

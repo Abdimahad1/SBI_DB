@@ -3,7 +3,7 @@ const Notification = require('../models/Notification');
 // ✅ Create a new notification with duplicate check
 exports.createNotification = async (req, res) => {
   try {
-    const { title, message, sender_name, sender_logo, user_id } = req.body;
+    const { title, message, sender_name, sender_logo, user_id, investment_id, businessId } = req.body;
 
     const targetUserId = user_id || req.userId;
 
@@ -23,7 +23,9 @@ exports.createNotification = async (req, res) => {
       title,
       message,
       sender_name,
-      sender_logo
+      sender_logo,
+      investment_id, // Include the investment_id if available
+      businessId // Include the businessId if available
     });
 
     res.status(201).json(notification);
@@ -31,7 +33,6 @@ exports.createNotification = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
 
 // ✅ Get all notifications for user
 exports.getUserNotifications = async (req, res) => {
