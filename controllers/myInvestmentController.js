@@ -3,30 +3,11 @@ const MyInvestment = require('../models/MyInvestment');
 // CREATE new investment
 exports.createMyInvestment = async (req, res) => {
   try {
-    const {
-      businessId,
-      title,
-      goalAmount,
-      currentContribution,
-      reason,
-      image,
-      purpose,
-      investment_id
-    } = req.body;
-
-    // Check for duplicate
-    const existing = await MyInvestment.findOne({
-      investorId: req.userId,
-      businessId,
-      title
-    });
-
-    if (existing) {
-      return res.status(409).json({ message: 'Investment already exists for this business.' });
-    }
+    const { businessId, investment_id, title, image, purpose, reason, goalAmount, currentContribution } = req.body;
+    const investorId = req.userId;
 
     const newInvestment = await MyInvestment.create({
-      investorId: req.userId,
+      investorId,
       businessId,
       investment_id,
       title,
@@ -40,10 +21,11 @@ exports.createMyInvestment = async (req, res) => {
 
     res.status(201).json(newInvestment);
   } catch (err) {
-    console.error('❌ Create Investment Error:', err);
-    res.status(500).json({ message: 'Failed to create investment', error: err.message });
+    console.error('❌ Failed to create investment:', err);
+    res.status(500).json({ message: err.message });
   }
 };
+
 
 // GET all investments for current investor
 exports.getMyInvestments = async (req, res) => {

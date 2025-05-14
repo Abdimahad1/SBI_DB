@@ -1,16 +1,16 @@
 const Investment = require('../models/Investment');
 
-// CREATE
+// CREATE investment (auto-generated _id by MongoDB)
 exports.createInvestment = async (req, res) => {
   try {
     const investmentData = { ...req.body };
 
-    // Automatically assign user_id if not included
+    // Automatically assign user_id if not provided
     if (!investmentData.user_id) {
       investmentData.user_id = req.userId;
     }
 
-    // ✅ Default to true only if explicitly marked
+    // Default investorInitiated to false if undefined
     if (typeof investmentData.isInvestorInitiated === 'undefined') {
       investmentData.isInvestorInitiated = false;
     }
@@ -23,20 +23,27 @@ exports.createInvestment = async (req, res) => {
   }
 };
 
-// GET ALL for business owner
+// GET investments for current business owner
 exports.getInvestments = async (req, res) => {
   try {
+    console.log('Fetching investments for user:', req.userId);
     const investments = await Investment.find({ user_id: req.userId });
+    console.log('Found investments:', investments);
     res.json(investments);
   } catch (err) {
+    console.error('❌ Failed to fetch investments:', {
+      message: err.message,
+      stack: err.stack,
+      userIdUsed: req.userId
+    });
     res.status(500).json({ message: err.message });
   }
 };
 
-// GET ALL visible to public (FindInvestments)
+// GET all public investments (used in investor view)
 exports.getAllInvestments = async (req, res) => {
   try {
-    const investments = await Investment.find({ isInvestorInitiated: { $ne: true } }) // exclude investor-created
+    const investments = await Investment.find({ isInvestorInitiated: { $ne: true } })
       .populate('user_id', 'name email')
       .sort({ createdAt: -1 });
 
@@ -47,11 +54,12 @@ exports.getAllInvestments = async (req, res) => {
 
     res.json(investmentsWithMeta);
   } catch (err) {
+    console.error('❌ Failed to load public investments:', err);
     res.status(500).json({ message: err.message });
   }
 };
 
-// UPDATE
+// UPDATE investment
 exports.updateInvestment = async (req, res) => {
   try {
     const updated = await Investment.findOneAndUpdate(
@@ -59,25 +67,34 @@ exports.updateInvestment = async (req, res) => {
       { $set: req.body },
       { new: true }
     );
-    if (!updated) return res.status(404).json({ message: 'Investment not found' });
+    if (!updated) {
+      return res.status(404).json({ message: 'Investment not found' });
+    }
     res.json(updated);
   } catch (err) {
+    console.error('❌ Investment update failed:', err);
     res.status(500).json({ message: err.message });
   }
 };
 
-// DELETE
+// DELETE investment
 exports.deleteInvestment = async (req, res) => {
   try {
-    const deleted = await Investment.findOneAndDelete({ _id: req.params.id, user_id: req.userId });
-    if (!deleted) return res.status(404).json({ message: 'Investment not found' });
+    const deleted = await Investment.findOneAndDelete({
+      _id: req.params.id,
+      user_id: req.userId
+    });
+    if (!deleted) {
+      return res.status(404).json({ message: 'Investment not found' });
+    }
     res.json({ message: 'Investment deleted successfully' });
   } catch (err) {
+    console.error('❌ Investment deletion failed:', err);
     res.status(500).json({ message: err.message });
   }
 };
 
-
+// GET investment by ID
 exports.getInvestmentById = async (req, res) => {
   try {
     const investment = await Investment.findById(req.params.id);
@@ -86,6 +103,7 @@ exports.getInvestmentById = async (req, res) => {
     }
     res.json(investment);
   } catch (err) {
+    console.error('❌ Failed to get investment by ID:', err);
     res.status(500).json({ message: err.message });
   }
 };

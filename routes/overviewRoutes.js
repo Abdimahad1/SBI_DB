@@ -101,6 +101,20 @@ router.get('/all-profiles-public', async (req, res) => {
   }
 });
 
+// ✅ NEW: Get overview for a specific businessId (user_id)
+router.get('/public/:id', async (req, res) => {
+  try {
+    const overview = await Overview.findOne({ user_id: req.params.id });
+    if (!overview) {
+      return res.status(404).json({ message: 'Overview not found' });
+    }
+    res.json(overview);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+
 
 // ✅ Authenticated routes for individual users
 router.post('/generate', auth, generateOverview);

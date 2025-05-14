@@ -6,7 +6,6 @@ exports.createInterestedInvestor = async (req, res) => {
     const { investment_id, name, email, message, image, title, purpose, goalAmount, currentContribution } = req.body;
     const user_id = req.userId;
 
-    // Check if the investment exists
     const investment = await MyInvestment.findOne({ investment_id });
     if (!investment) {
       return res.status(404).json({ message: 'Investment not found' });
@@ -15,6 +14,7 @@ exports.createInterestedInvestor = async (req, res) => {
     const newInvestor = await InterestedInvestor.create({
       investment_id,
       user_id,
+      businessId: investment.businessId,
       name,
       email,
       message,
@@ -23,7 +23,7 @@ exports.createInterestedInvestor = async (req, res) => {
       purpose,
       goalAmount,
       currentContribution,
-      status: investment.status // Use the status from MyInvestment
+      status: investment.status
     });
 
     res.status(201).json(newInvestor);
@@ -33,33 +33,24 @@ exports.createInterestedInvestor = async (req, res) => {
   }
 };
 
+// GET interested investors for current business owner
 exports.getInterestedInvestors = async (req, res) => {
   try {
-    // First get all interested investors
-    const investors = await InterestedInvestor.find();
-    
-    // Then update their status from MyInvestment collection
-    const updatedInvestors = await Promise.all(investors.map(async (inv) => {
-      try {
-        const investment = await MyInvestment.findOne({ investment_id: inv.investment_id });
-        if (investment && investment.status !== inv.status) {
-          // Update status in InterestedInvestor if different
-          await InterestedInvestor.findByIdAndUpdate(inv._id, { status: investment.status });
-          return { ...inv._doc, status: investment.status };
-        }
-        return inv;
-      } catch (err) {
-        console.error('Error syncing status for investor:', inv._id, err);
-        return inv;
-      }
-    }));
+    const userId = req.userId; // this is the business owner's ID
 
-    res.json(updatedInvestors);
+    // ✅ Get only investors interested in *this* business owner's investments
+    const investments = await InterestedInvestor.find({ businessId: userId });
+
+    res.status(200).json(investments);
   } catch (err) {
-    console.error('❌ Failed to fetch investors:', err);
-    res.status(500).json({ message: err.message });
+    console.error('Error fetching interested investors:', err);
+    res.status(500).json({ message: 'Failed to fetch interested investors' });
   }
 };
+
+
+
+
 
 // Add this new controller method
 exports.updateInvestorStatus = async (req, res) => {

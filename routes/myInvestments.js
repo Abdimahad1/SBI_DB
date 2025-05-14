@@ -1,46 +1,34 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middlewares/authMiddleware');
+const auth = require('../middlewares/authMiddleware'); // ✅ You exported default, so this is correct
 const {
   createMyInvestment,
   getMyInvestments,
   updateStatusByInvestmentId,
   getInvestmentById
 } = require('../controllers/myInvestmentController');
-router.get('/by-investment', auth, getInvestmentById);
 
-// Logging middleware for debugging
+const MyInvestment = require('../models/MyInvestment'); // Needed for :id route
+
+// Logging middleware (optional for debug)
 router.use((req, res, next) => {
-  console.log(`MyInvestments route accessed: ${req.method} ${req.path}`);
+  console.log(`[MyInvestments] ${req.method} ${req.path}`);
   next();
 });
 
-// Create investment
+// Create new investment (Investor -> Business)
 router.post('/', auth, createMyInvestment);
 
-// Get investments for investor
+// Get all investments for current investor
 router.get('/', auth, getMyInvestments);
 
-// Update investment status
-router.patch('/update-status', auth, (req, res, next) => {
-  console.log('Update status route hit', req.body);
-  next();
-}, updateStatusByInvestmentId);
+// Update investment status using investment_id
+router.patch('/update-status', auth, updateStatusByInvestmentId);
 
-// Test route for debugging
-router.get('/test-connection', (req, res) => {
-  res.json({ 
-    success: true,
-    message: "My Investments route is connected",
-    availableEndpoints: [
-      'POST /',
-      'GET /',
-      'PATCH /update-status'
-    ]
-  });
-});
+// Get investment using ?investment_id=abc
+router.get('/by-investment', auth, getInvestmentById);
 
-// GET specific investment by investment_id
+// Get investment by path param :id
 router.get('/by-investment-id/:id', auth, async (req, res) => {
   try {
     const investment = await MyInvestment.findOne({ investment_id: req.params.id });
@@ -54,6 +42,19 @@ router.get('/by-investment-id/:id', auth, async (req, res) => {
   }
 });
 
-
+// Optional: test route
+router.get('/test-connection', (req, res) => {
+  res.json({
+    success: true,
+    message: 'MyInvestments route connected',
+    available: [
+      'POST /',
+      'GET /',
+      'GET /by-investment',
+      'GET /by-investment-id/:id',
+      'PATCH /update-status'
+    ]
+  });
+});
 
 module.exports = router;

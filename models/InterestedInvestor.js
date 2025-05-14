@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 
 const InterestedInvestorSchema = new mongoose.Schema({
   investment_id: { type: String, required: true },
-  user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // will be added from JWT middleware
+  user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // investor's ID
+  businessId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // 💥 NEW: for filtering
   name: { type: String, required: true },
   email: { type: String },
   message: { type: String },
@@ -11,7 +12,8 @@ const InterestedInvestorSchema = new mongoose.Schema({
   purpose: { type: String },
   goalAmount: { type: Number },
   currentContribution: { type: Number },
-  status: { type: String, default: 'pending' }, // can be 'pending', 'accepted', 'rejected'
+  status: { type: String, default: 'pending' },
 }, { timestamps: true });
 
 module.exports = mongoose.model('InterestedInvestor', InterestedInvestorSchema);
+
