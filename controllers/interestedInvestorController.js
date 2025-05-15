@@ -1,5 +1,6 @@
 const InterestedInvestor = require('../models/InterestedInvestor');
 const MyInvestment = require('../models/MyInvestment');
+const Notification = require('../models/Notification');
 
 exports.createInterestedInvestor = async (req, res) => {
   try {
@@ -48,61 +49,44 @@ exports.getInterestedInvestors = async (req, res) => {
   }
 };
 
-
-
-
-
-// Add this new controller method
 exports.updateInvestorStatus = async (req, res) => {
-    try {
-      const { investment_id, status } = req.body;
-      
-      // Validate input
-      if (!investment_id || !status) {
-        return res.status(400).json({ message: 'investment_id and status are required' });
-      }
-  
-      // Update both collections in a transaction
-      const session = await mongoose.startSession();
-      session.startTransaction();
-  
-      try {
-        const [updatedInvestment, updatedInvestor] = await Promise.all([
-          MyInvestment.findOneAndUpdate(
-            { investment_id },
-            { status },
-            { new: true, session }
-          ),
-          InterestedInvestor.findOneAndUpdate(
-            { investment_id },
-            { status },
-            { new: true, session }
-          )
-        ]);
-  
-        if (!updatedInvestment || !updatedInvestor) {
-          await session.abortTransaction();
-          return res.status(404).json({ message: 'Investment not found in one or both collections' });
-        }
-  
-        await session.commitTransaction();
-        res.json({
-          success: true,
-          myInvestment: updatedInvestment,
-          interestedInvestor: updatedInvestor
-        });
-      } catch (err) {
-        await session.abortTransaction();
-        throw err;
-      } finally {
-        session.endSession();
-      }
-    } catch (err) {
-      console.error('❌ Failed to update investor status:', err);
-      res.status(500).json({ message: err.message });
+  try {
+    const { investment_id, status } = req.body;
+
+    // Validate input
+    if (!investment_id || !status) {
+      return res.status(400).json({ message: 'investment_id and status are required' });
     }
-  };
-  
+
+    // Update the investment status
+    const updatedInvestment = await MyInvestment.findOneAndUpdate(
+      { investment_id },
+      { status },
+      { new: true }
+    );
+
+    if (!updatedInvestment) {
+      return res.status(404).json({ message: 'Investment not found' });
+    }
+
+    // Find interested investors for this investment
+    const interestedInvestors = await InterestedInvestor.find({ investment_id });
+
+    // Send notifications to each interested investor
+    for (const investor of interestedInvestors) {
+      await Notification.create({
+        user_id: investor.user_id, // Send to the investor
+        title: 'Investment Status Update',
+        message: `Your investment in "${updatedInvestment.title}" has been ${status}.`,
+      });
+    }
+
+    res.json({ success: true, updatedInvestment });
+  } catch (err) {
+    console.error('❌ Failed to update investor status:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
 
 exports.deleteInterestedInvestor = async (req, res) => {
   try {

@@ -4,7 +4,7 @@ const {
   createInterestedInvestor, 
   getInterestedInvestors, 
   deleteInterestedInvestor,
-  updateInvestorStatus // Make sure this is imported
+  updateInvestorStatus // Ensure this is imported
 } = require('../controllers/interestedInvestorController');
 const authMiddleware = require('../middlewares/authMiddleware');
 

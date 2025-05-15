@@ -16,7 +16,6 @@ exports.createNotification = async (req, res) => {
 
     const targetUserId = user_id || req.userId;
 
-    // Log who's receiving the notification
     console.log(`🔔 Creating notification for user: ${targetUserId}`);
 
     // Prevent exact duplicates
@@ -49,12 +48,24 @@ exports.createNotification = async (req, res) => {
   }
 };
 
-// ✅ Get all notifications for the logged-in user
+// ✅ Get all notifications for the logged-in user with role-based filter
 exports.getUserNotifications = async (req, res) => {
   try {
-    console.log('🔍 Fetching notifications for user_id:', req.userId);
+    const userId = req.userId;
+    console.log('🔍 Fetching notifications for user_id:', userId);
 
-    const notifications = await Notification.find({ user_id: req.userId }).sort({ createdAt: -1 });
+    // Fetch the user to get their role
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    let query = { user_id: userId };
+
+    // Only show investment-related notifications to investors
+    if (user.role === 'Investor') {
+      query.title = 'Investment Status Update';
+    }
+
+    const notifications = await Notification.find(query).sort({ createdAt: -1 });
 
     console.log(`✅ Found ${notifications.length} notifications`);
     res.json(notifications);
@@ -63,7 +74,6 @@ exports.getUserNotifications = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
 
 // ✅ Mark a single notification as read
 exports.markAsRead = async (req, res) => {
@@ -99,7 +109,6 @@ exports.deleteNotification = async (req, res) => {
 };
 
 // ✅ Broadcast notification to all users (optionally by role)
-// In NotificationsController.js
 exports.broadcastNotification = async (req, res) => {
   try {
     const {
@@ -110,10 +119,10 @@ exports.broadcastNotification = async (req, res) => {
       investment_id,
       businessId,
       role,
-      creatorId // Add this new field
+      creatorId
     } = req.body;
 
-    // If creatorId is provided, only send to that user
+    // If creatorId is provided, send only to that user
     if (creatorId) {
       const existing = await Notification.findOne({
         user_id: creatorId,
@@ -137,10 +146,11 @@ exports.broadcastNotification = async (req, res) => {
           notification
         });
       }
+
       return res.status(200).json({ message: 'Notification already exists for creator' });
     }
 
-    // Rest of your existing broadcast logic...
+    // TODO: Add broadcast logic if needed
   } catch (err) {
     console.error('❌ Error in broadcastNotification:', err.message);
     res.status(500).json({ message: err.message });

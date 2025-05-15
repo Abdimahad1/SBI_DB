@@ -1,4 +1,6 @@
 const MyInvestment = require('../models/MyInvestment');
+const InterestedInvestor = require('../models/InterestedInvestor');
+const Notification = require('../models/Notification');
 
 // CREATE new investment
 exports.createMyInvestment = async (req, res) => {
@@ -41,52 +43,41 @@ exports.getMyInvestments = async (req, res) => {
 // PATCH: Update investment status using investment_id
 // Update the updateStatusByInvestmentId function
 exports.updateStatusByInvestmentId = async (req, res) => {
-    const { investment_id, status } = req.body;
-  
-    if (!investment_id || !status) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'Missing investment_id or status',
-        required: ['investment_id', 'status']
-      });
-    }
-  
-    try {
-      // First check if investment exists
-      const investment = await MyInvestment.findOne({ investment_id });
-      
-      if (!investment) {
-        return res.status(404).json({
-          success: false,
-          message: `Investment not found`,
-          suggestion: 'Verify the investment_id exists',
-          received_id: investment_id
-        });
-      }
-  
-      // Then update it
-      const updated = await MyInvestment.findOneAndUpdate(
-        { investment_id },
-        { status },
-        { new: true, runValidators: true }
-      );
-  
-      res.json({
-        success: true,
-        message: 'Status updated successfully',
-        investment: updated
-      });
-    } catch (err) {
-      console.error('Update status error:', err);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to update status',
-        error: err.message
-      });
-    }
-  };
+  const { investment_id, status } = req.body;
 
-  // Add this to your existing exports
+  if (!investment_id || !status) {
+    return res.status(400).json({ message: 'Missing investment_id or status' });
+  }
+
+  try {
+    const investment = await MyInvestment.findOne({ investment_id });
+
+    if (!investment) {
+      return res.status(404).json({ message: 'Investment not found' });
+    }
+
+    // Update the investment status
+    investment.status = status;
+    await investment.save();
+
+    // Notify interested investors
+    const interestedInvestors = await InterestedInvestor.find({ investment_id });
+    for (const investor of interestedInvestors) {
+      await Notification.create({
+        user_id: investor.user_id,
+        title: 'Investment Status Update',
+        message: `Your investment in "${investment.title}" has been ${status}.`,
+      });
+    }
+
+    res.json({ success: true, investment });
+  } catch (err) {
+    console.error('Update status error:', err);
+    res.status(500).json({ message: 'Failed to update status' });
+  }
+};
+
+// Add this to your existing exports
 exports.getInvestmentById = async (req, res) => {
   try {
     const { investment_id } = req.query;
