@@ -6,12 +6,38 @@ const NotificationSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
-  title: { type: String, required: true },
-  message: { type: String, required: true },
-  sender_name: { type: String }, // ✅ NEW
-  sender_logo: { type: String }, // ✅ NEW
-  read: { type: Boolean, default: false }
-}, { timestamps: true });
-
+  creator_id: {  // Add this field to track who created the content
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  title: { 
+    type: String, 
+    required: true 
+  },
+  message: { 
+    type: String, 
+    required: true 
+  },
+  sender_name: { 
+    type: String 
+  },
+  sender_logo: { 
+    type: String 
+  },
+  read: { 
+    type: Boolean, 
+    default: false 
+  },
+  related_entity: {  // Add this to track what entity this notification is about
+    type: String,
+    enum: ['goal', 'product', 'financial', 'other'],
+    default: 'other'
+  },
+  related_entity_id: {  // Add this to reference the specific entity
+    type: mongoose.Schema.Types.ObjectId
+  }
+}, { 
+  timestamps: true 
+});
 
 module.exports = mongoose.model('Notification', NotificationSchema);

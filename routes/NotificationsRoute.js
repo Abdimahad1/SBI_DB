@@ -5,13 +5,15 @@ const {
   createNotification,
   getUserNotifications,
   markAsRead,
-  deleteNotification
+  deleteNotification,
+  broadcastNotification
 } = require('../controllers/NotificationsController');
 
 // Notifications Routes
-router.post('/', auth, createNotification);       // Create notification
-router.get('/', auth, getUserNotifications);       // Get all notifications
-router.patch('/:id', auth, markAsRead);            // Mark one as read
-router.delete('/:id', auth, deleteNotification);   // Delete notification
+router.post('/broadcast', auth, broadcastNotification);   // Broadcast should come first
+router.post('/', auth, createNotification);               // Create notification
+router.get('/', auth, getUserNotifications);              // Get all notifications
+router.patch('/:id', auth, markAsRead);                   // Mark one as read
+router.delete('/:id', auth, deleteNotification);          // Delete notification
 
 module.exports = router;

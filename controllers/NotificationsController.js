@@ -1,13 +1,25 @@
 const Notification = require('../models/Notification');
+const User = require('../models/User');
 
 // ✅ Create a new notification with duplicate check
 exports.createNotification = async (req, res) => {
   try {
-    const { title, message, sender_name, sender_logo, user_id, investment_id, businessId } = req.body;
+    const {
+      title,
+      message,
+      sender_name,
+      sender_logo,
+      user_id,
+      investment_id,
+      businessId
+    } = req.body;
 
     const targetUserId = user_id || req.userId;
 
-    // Prevent duplicate
+    // Log who's receiving the notification
+    console.log(`🔔 Creating notification for user: ${targetUserId}`);
+
+    // Prevent exact duplicates
     const existingNotification = await Notification.findOne({
       user_id: targetUserId,
       title,
@@ -15,6 +27,7 @@ exports.createNotification = async (req, res) => {
     });
 
     if (existingNotification) {
+      console.log('⚠️ Duplicate notification exists for this user.');
       return res.status(200).json({ message: 'Notification already exists' });
     }
 
@@ -24,27 +37,35 @@ exports.createNotification = async (req, res) => {
       message,
       sender_name,
       sender_logo,
-      investment_id, // Include the investment_id if available
-      businessId // Include the businessId if available
+      investment_id,
+      businessId
     });
 
+    console.log('✅ Notification created:', notification._id);
     res.status(201).json(notification);
   } catch (err) {
+    console.error('❌ Error in createNotification:', err.message);
     res.status(500).json({ message: err.message });
   }
 };
 
-// ✅ Get all notifications for user
+// ✅ Get all notifications for the logged-in user
 exports.getUserNotifications = async (req, res) => {
   try {
+    console.log('🔍 Fetching notifications for user_id:', req.userId);
+
     const notifications = await Notification.find({ user_id: req.userId }).sort({ createdAt: -1 });
+
+    console.log(`✅ Found ${notifications.length} notifications`);
     res.json(notifications);
   } catch (err) {
+    console.error('❌ Error in getUserNotifications:', err.message);
     res.status(500).json({ message: err.message });
   }
 };
 
-// ✅ Mark notification as read
+
+// ✅ Mark a single notification as read
 exports.markAsRead = async (req, res) => {
   try {
     const updated = await Notification.findOneAndUpdate(
@@ -52,19 +73,76 @@ exports.markAsRead = async (req, res) => {
       { $set: { read: true } },
       { new: true }
     );
-    if (!updated) return res.status(404).json({ message: 'Notification not found' });
+
+    if (!updated) {
+      return res.status(404).json({ message: 'Notification not found' });
+    }
+
+    console.log('✅ Marked notification as read:', updated._id);
     res.json(updated);
   } catch (err) {
+    console.error('❌ Error in markAsRead:', err.message);
     res.status(500).json({ message: err.message });
   }
 };
 
-// ✅ Delete a notification
+// ✅ Delete a single notification
 exports.deleteNotification = async (req, res) => {
   try {
     await Notification.deleteOne({ _id: req.params.id, user_id: req.userId });
+    console.log('🗑️ Deleted notification:', req.params.id);
     res.json({ message: 'Notification deleted successfully' });
   } catch (err) {
+    console.error('❌ Error in deleteNotification:', err.message);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ✅ Broadcast notification to all users (optionally by role)
+// In NotificationsController.js
+exports.broadcastNotification = async (req, res) => {
+  try {
+    const {
+      title,
+      message,
+      sender_name,
+      sender_logo,
+      investment_id,
+      businessId,
+      role,
+      creatorId // Add this new field
+    } = req.body;
+
+    // If creatorId is provided, only send to that user
+    if (creatorId) {
+      const existing = await Notification.findOne({
+        user_id: creatorId,
+        title,
+        message
+      });
+
+      if (!existing) {
+        const notification = await Notification.create({
+          user_id: creatorId,
+          title,
+          message,
+          sender_name,
+          sender_logo,
+          investment_id,
+          businessId
+        });
+        console.log('✅ Notification sent to creator:', creatorId);
+        return res.status(201).json({
+          message: 'Notification sent to creator',
+          notification
+        });
+      }
+      return res.status(200).json({ message: 'Notification already exists for creator' });
+    }
+
+    // Rest of your existing broadcast logic...
+  } catch (err) {
+    console.error('❌ Error in broadcastNotification:', err.message);
     res.status(500).json({ message: err.message });
   }
 };
