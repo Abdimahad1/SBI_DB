@@ -10,7 +10,6 @@ const notificationRoutes = require('./routes/NotificationsRoute');
 const productRoutes = require('./routes/productRoutes'); 
 const goalRoutes = require('./routes/goalRoutes');
 const investmentRoutes = require('./routes/investmentRoutes');
-const sellBusinessRoutes = require('./routes/sellBusinessRoutes');
 const customerViewRoutes = require('./routes/customerViewRoutes');
 const overviewRoutes = require('./routes/overviewRoutes');
 const locationRoutes = require('./routes/locationRoutes'); 
@@ -19,6 +18,8 @@ const notificationsRoutes = require('./routes/NotificationsRoute');
 const predictionFieldsRoutes = require('./routes/predictionFieldsRoutes'); 
 const interestedInvestorRoutes = require('./routes/interestedInvestorRoutes');
 const myInvestmentsRoutes = require('./routes/myInvestments');
+const businessProfileFormRoutes = require('./routes/businessProfileRoutesForm');
+
 
 
 // Load environment variables
@@ -36,11 +37,11 @@ app.use(express.json());
 // Route Definitions
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', businessProfileRoutes);
+app.use('/api/profile-form', businessProfileFormRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/products', productRoutes); 
 app.use('/api/goals', goalRoutes);
 app.use('/api/investments', investmentRoutes);
-app.use('/api/sell-business', sellBusinessRoutes);
 app.use('/uploads', express.static('uploads'));
 app.use('/api/customer-view', customerViewRoutes);
 app.use('/api/overview', overviewRoutes);

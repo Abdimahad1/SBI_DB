@@ -8,11 +8,11 @@ const {
 } = require('../controllers/businessProfileController');
 const BusinessProfile = require('../models/BusinessProfile');
 
-// ✅ Authenticated routes
+// Authenticated routes
 router.get('/', auth, getProfile);
 router.put('/', auth, upload.single('logo'), updateProfile);
 
-// ✅ Public route to get a business profile by user_id (for InvestorDashboard)
+// Public route to get a business profile by user_id
 router.get('/public/:userId', async (req, res) => {
   try {
     const profile = await BusinessProfile.findOne({ user_id: req.params.userId });

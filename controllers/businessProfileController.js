@@ -11,7 +11,11 @@ exports.getProfile = async (req, res) => {
 
 exports.updateProfile = async (req, res) => {
   try {
-    const updateData = { ...req.body };
+    const updateData = { 
+      business_name: req.body.business_name,
+      location: req.body.location,
+      business_email: req.body.business_email
+    };
 
     // If an image file is uploaded, add it to the update
     if (req.file) {
