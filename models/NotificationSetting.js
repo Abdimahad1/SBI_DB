@@ -9,7 +9,7 @@ const NotificationSettingSchema = new mongoose.Schema({
   },
   email_alerts: { type: Boolean, default: true },
   in_app: { type: Boolean, default: true },
-  sound: { type: Boolean, default: false }
+  sound: { type: Boolean, default: true }
 }, { timestamps: true });
 
 module.exports = mongoose.model('NotificationSetting', NotificationSettingSchema);

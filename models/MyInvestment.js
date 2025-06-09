@@ -12,9 +12,8 @@ const MyInvestmentSchema = new mongoose.Schema({
     required: true
   },
   investment_id: {
-    type: String, // ✅ This is important to connect with notifications and status updates
-    required: true,
-    unique: true // Optional but helpful to prevent duplicates
+    type: String,
+    required: true
   },
   title: String,
   image: String,
@@ -28,5 +27,8 @@ const MyInvestmentSchema = new mongoose.Schema({
     default: 'pending'
   }
 }, { timestamps: true });
+
+// ✅ Prevent duplicate (same investor + same investment)
+MyInvestmentSchema.index({ investment_id: 1, investorId: 1 }, { unique: true });
 
 module.exports = mongoose.model('MyInvestment', MyInvestmentSchema);

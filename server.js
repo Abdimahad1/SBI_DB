@@ -15,7 +15,6 @@ const overviewRoutes = require('./routes/overviewRoutes');
 const locationRoutes = require('./routes/locationRoutes'); 
 const notificationSettingsRoutes = require('./routes/NotificationSettingsRoute');
 const notificationsRoutes = require('./routes/NotificationsRoute');
-const predictionFieldsRoutes = require('./routes/predictionFieldsRoutes'); 
 const interestedInvestorRoutes = require('./routes/interestedInvestorRoutes');
 const myInvestmentsRoutes = require('./routes/myInvestments');
 const businessProfileFormRoutes = require('./routes/businessProfileRoutesForm');
@@ -48,7 +47,6 @@ app.use('/api/overview', overviewRoutes);
 app.use('/api/locations', locationRoutes); 
 app.use('/api/notification-settings', notificationSettingsRoutes);    // For settings (sound, in-app, email)
 app.use('/api/real-notifications', notificationsRoutes); 
-app.use('/api/prediction-fields', predictionFieldsRoutes);
 app.use('/api/investors-interested', interestedInvestorRoutes);
 app.use('/api/my-investments', myInvestmentsRoutes);
 

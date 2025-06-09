@@ -5,8 +5,24 @@ const Notification = require('../models/Notification');
 // CREATE new investment
 exports.createMyInvestment = async (req, res) => {
   try {
-    const { businessId, investment_id, title, image, purpose, reason, goalAmount, currentContribution } = req.body;
+    const {
+      businessId,
+      investment_id,
+      title,
+      image,
+      purpose,
+      reason,
+      goalAmount,
+      currentContribution
+    } = req.body;
+
     const investorId = req.userId;
+
+    // ✅ Duplicate check here
+    const exists = await MyInvestment.findOne({ investorId, investment_id });
+    if (exists) {
+      return res.status(409).json({ message: 'You already have this investment saved.' });
+    }
 
     const newInvestment = await MyInvestment.create({
       investorId,
@@ -97,3 +113,20 @@ exports.getInvestmentById = async (req, res) => {
   }
 };
 
+exports.checkInvestmentExists = async (req, res) => {
+  try {
+    const investorId = req.userId; // from auth middleware
+    const { investment_id } = req.query;
+
+    if (!investment_id) {
+      return res.status(400).json({ message: 'investment_id is required' });
+    }
+
+    const exists = await MyInvestment.findOne({ investorId, investment_id });
+
+    res.json({ exists: !!exists });
+  } catch (err) {
+    console.error('Check investment exists error:', err);
+    res.status(500).json({ message: 'Failed to check investment existence' });
+  }
+};

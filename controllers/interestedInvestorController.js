@@ -1,21 +1,12 @@
+const Investment = require('../models/Investment');
 const InterestedInvestor = require('../models/InterestedInvestor');
 const MyInvestment = require('../models/MyInvestment');
 const Notification = require('../models/Notification');
 
 exports.createInterestedInvestor = async (req, res) => {
   try {
-    const { investment_id, name, email, message, image, title, purpose, goalAmount, currentContribution } = req.body;
-    const user_id = req.userId;
-
-    const investment = await MyInvestment.findOne({ investment_id });
-    if (!investment) {
-      return res.status(404).json({ message: 'Investment not found' });
-    }
-
-    const newInvestor = await InterestedInvestor.create({
+    const {
       investment_id,
-      user_id,
-      businessId: investment.businessId,
       name,
       email,
       message,
@@ -23,11 +14,35 @@ exports.createInterestedInvestor = async (req, res) => {
       title,
       purpose,
       goalAmount,
+      currentContribution
+    } = req.body;
+
+    const user_id = req.userId;
+
+    // ✅ Validate that the investment exists in the Investment model
+    const investment = await Investment.findById(investment_id);
+    if (!investment) {
+      return res.status(404).json({ message: 'Investment not found' });
+    }
+
+    // ✅ Create InterestedInvestor entry (saves investor profile image only)
+    const interestedInvestor = await InterestedInvestor.create({
+      investment_id,
+      user_id,
+      businessId: investment.user_id, // business owner's ID
+      name,
+      email,
+      message,
+      image, // investor profile image
+      title,
+      purpose,
+      goalAmount,
       currentContribution,
-      status: investment.status
+      status: 'pending'
     });
 
-    res.status(201).json(newInvestor);
+    res.status(201).json({ interestedInvestor });
+
   } catch (err) {
     console.error('❌ Failed to save interested investor:', err);
     res.status(500).json({ message: err.message });
@@ -38,10 +53,7 @@ exports.createInterestedInvestor = async (req, res) => {
 exports.getInterestedInvestors = async (req, res) => {
   try {
     const userId = req.userId; // this is the business owner's ID
-
-    // ✅ Get only investors interested in *this* business owner's investments
     const investments = await InterestedInvestor.find({ businessId: userId });
-
     res.status(200).json(investments);
   } catch (err) {
     console.error('Error fetching interested investors:', err);
@@ -53,12 +65,10 @@ exports.updateInvestorStatus = async (req, res) => {
   try {
     const { investment_id, status } = req.body;
 
-    // Validate input
     if (!investment_id || !status) {
       return res.status(400).json({ message: 'investment_id and status are required' });
     }
 
-    // Update the investment status
     const updatedInvestment = await MyInvestment.findOneAndUpdate(
       { investment_id },
       { status },
@@ -69,13 +79,11 @@ exports.updateInvestorStatus = async (req, res) => {
       return res.status(404).json({ message: 'Investment not found' });
     }
 
-    // Find interested investors for this investment
     const interestedInvestors = await InterestedInvestor.find({ investment_id });
 
-    // Send notifications to each interested investor
     for (const investor of interestedInvestors) {
       await Notification.create({
-        user_id: investor.user_id, // Send to the investor
+        user_id: investor.user_id,
         title: 'Investment Status Update',
         message: `Your investment in "${updatedInvestment.title}" has been ${status}.`,
       });

@@ -8,37 +8,25 @@ import os
 import warnings
 from sklearn.exceptions import InconsistentVersionWarning
 
-# === Suppress warnings ===
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
 
-# === Initialize Flask App ===
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app)
 
-# === Define model directory ===
-MODEL_DIR = r'C:\Users\Hp\Desktop\SBI_DB\ml-model-api\model_files'  # Update this path
+MODEL_DIR = r'C:\Users\Hp\Desktop\SBI_DB\ml-model-api\model_files'
 os.makedirs(MODEL_DIR, exist_ok=True)
 
-# === Load Model Artifacts ===
 try:
-    # Load model
     model = joblib.load(os.path.join(MODEL_DIR, 'xgboost_model.pkl'))
-    
-    # Load label encoders
     label_encoders = joblib.load(os.path.join(MODEL_DIR, 'label_encoders.pkl'))
-    
-    # Load feature names
     feature_names = joblib.load(os.path.join(MODEL_DIR, 'feature_names.pkl'))
-    
     print("✅ Model artifacts loaded successfully.")
-    print(f"📊 Features expected by model: {feature_names}")
 except Exception as e:
     print(f"❌ Failed to load model artifacts: {str(e)}")
     raise e
 
-# === /predict endpoint ===
 @app.route('/predict', methods=['POST'])
 def predict():
     try:
@@ -46,8 +34,7 @@ def predict():
             return jsonify({"error": "Request must be JSON", "status": "failed"}), 400
 
         data = request.get_json()
-        
-        # Validate required fields (adjust based on your model's features)
+
         required_fields = [
             'market', 'founded_year', 'funding_total_usd', 'funding_rounds',
             'country_code', 'city'
@@ -56,25 +43,27 @@ def predict():
             if field not in data:
                 return jsonify({"error": f"Missing required field: {field}", "status": "failed"}), 400
 
-        # Check that at least one funding field is provided
         funding_fields = ['seed', 'venture', 'angel', 'debt_financing', 
                           'convertible_note', 'equity_crowdfunding', 
                           'private_equity', 'post_ipo_equity']
-        
-        if not any(data.get(field, 0) > 0 for field in funding_fields):
-            return jsonify({"error": "At least one funding field must be provided", "status": "failed"}), 400
 
-        # Calculate business age
+        if not any(data.get(field, 0) > 0 for field in funding_fields):
+            return jsonify({
+                "error": "No funding types were selected. Please provide at least one source of funding (e.g., seed, venture, or debt financing).",
+                "status": "failed"
+            }), 400
+
         current_year = datetime.now().year
         business_age = current_year - int(data['founded_year'])
 
-        # Check if business age is at least 5 years
         if business_age < 5:
-            return jsonify({"error": "Business must be at least 5 years old to be considered safe", "status": "failed"}), 400
+            return jsonify({
+                "error": "Business must be at least 5 years old to be considered safe",
+                "status": "failed"
+            }), 400
 
-        # Prepare input data
         input_data = {
-            'name': data.get('name', 'Unknown'),  # Optional
+            'name': data.get('name', 'Unknown'),
             'market': data['market'],
             'founded_year': int(data['founded_year']),
             'funding_total_usd': float(data['funding_total_usd']),
@@ -89,31 +78,47 @@ def predict():
             'post_ipo_equity': float(data.get('post_ipo_equity', 0)),
             'country_code': data['country_code'],
             'city': data['city'],
-            'first_funding_year': int(data.get('first_funding_year', data['founded_year']))  # Default to founded_year if missing
+            'first_funding_year': int(data.get('first_funding_year', data['founded_year']))
         }
 
-        # Create DataFrame
         df = pd.DataFrame([input_data])
 
-        # Encode categorical features using saved label encoders
         for col in label_encoders:
             if col in df.columns:
                 try:
                     df[col] = label_encoders[col].transform(df[col].astype(str))
                 except ValueError:
-                    df[col] = 0  # Handle unseen labels
+                    df[col] = 0
 
-        # Ensure feature order matches training
         df = df[feature_names]
 
-        # Predict
-        probability = model.predict_proba(df)[0][1]  # Probability of class 1 (Safe)
-        prediction = model.predict(df)[0]  # 0 or 1
+        probability = model.predict_proba(df)[0][1]
+        prediction = model.predict(df)[0]
+
+        # === Explanation Logic ===
+        explanation = []
+        if business_age >= 10:
+            explanation.append("The business has been operating for over 10 years, indicating strong stability.")
+        elif business_age >= 5:
+            explanation.append("The business has a healthy age of over 5 years, suggesting resilience.")
+        
+        if data.get("debt_financing", 0) > 0:
+            explanation.append("Debt financing detected, which often reflects financial trust by lenders.")
+        if data.get("seed", 0) > 0:
+            explanation.append("Seed funding is present, indicating investor confidence at an early stage.")
+        if data.get("venture", 0) > 0:
+            explanation.append("Venture funding implies high-growth potential and backing.")
+        if data.get("equity_crowdfunding", 0) > 0:
+            explanation.append("Equity crowdfunding reflects public interest and community support.")
+
+        if not explanation:
+            explanation.append("Low funding and minimal history may increase investment risk.")
 
         return jsonify({
             "prediction": "Safe" if prediction == 1 else "Not Safe",
             "probability": round(float(probability), 4),
-            "status": "success"
+            "status": "success",
+            "explanation": explanation
         })
 
     except ValueError as ve:
@@ -121,7 +126,6 @@ def predict():
     except Exception as e:
         return jsonify({"error": str(e), "status": "failed"}), 500
 
-# === /health endpoint ===
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({
@@ -130,6 +134,5 @@ def health_check():
         "required_features": feature_names
     })
 
-# === Run the server ===
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=3000, debug=True)
