@@ -31,9 +31,11 @@ except Exception as e:
 def predict():
     try:
         if not request.is_json:
+            print("❌ Request is not JSON")
             return jsonify({"error": "Request must be JSON", "status": "failed"}), 400
 
         data = request.get_json()
+        print("📥 Received data:", data)  # 🔍 Log incoming JSON
 
         required_fields = [
             'market', 'founded_year', 'funding_total_usd', 'funding_rounds',
@@ -41,13 +43,16 @@ def predict():
         ]
         for field in required_fields:
             if field not in data:
+                print(f"❌ Missing field: {field}")
                 return jsonify({"error": f"Missing required field: {field}", "status": "failed"}), 400
 
-        funding_fields = ['seed', 'venture', 'angel', 'debt_financing', 
-                          'convertible_note', 'equity_crowdfunding', 
-                          'private_equity', 'post_ipo_equity']
-
+        funding_fields = [
+            'seed', 'venture', 'angel', 'debt_financing', 
+            'convertible_note', 'equity_crowdfunding', 
+            'private_equity', 'post_ipo_equity'
+        ]
         if not any(data.get(field, 0) > 0 for field in funding_fields):
+            print("❌ No valid funding fields provided.")
             return jsonify({
                 "error": "No funding types were selected. Please provide at least one source of funding (e.g., seed, venture, or debt financing).",
                 "status": "failed"
@@ -57,6 +62,7 @@ def predict():
         business_age = current_year - int(data['founded_year'])
 
         if business_age < 5:
+            print("❌ Business too young:", business_age)
             return jsonify({
                 "error": "Business must be at least 5 years old to be considered safe",
                 "status": "failed"
@@ -81,21 +87,24 @@ def predict():
             'first_funding_year': int(data.get('first_funding_year', data['founded_year']))
         }
 
+        print("🧪 Cleaned input data for model:", input_data)
+
         df = pd.DataFrame([input_data])
 
         for col in label_encoders:
             if col in df.columns:
                 try:
                     df[col] = label_encoders[col].transform(df[col].astype(str))
-                except ValueError:
+                except ValueError as ve:
+                    print(f"⚠️ Label encoding failed for column: {col} — {ve}")
                     df[col] = 0
 
         df = df[feature_names]
+        print("📊 Final DataFrame for prediction:\n", df)
 
         probability = model.predict_proba(df)[0][1]
         prediction = model.predict(df)[0]
 
-        # === Explanation Logic ===
         explanation = []
         if business_age >= 10:
             explanation.append("The business has been operating for over 10 years, indicating strong stability.")
@@ -114,6 +123,8 @@ def predict():
         if not explanation:
             explanation.append("Low funding and minimal history may increase investment risk.")
 
+        print("✅ Prediction:", "Safe" if prediction == 1 else "Not Safe", "| Probability:", probability)
+
         return jsonify({
             "prediction": "Safe" if prediction == 1 else "Not Safe",
             "probability": round(float(probability), 4),
@@ -122,9 +133,12 @@ def predict():
         })
 
     except ValueError as ve:
+        print("❌ ValueError:", ve)
         return jsonify({"error": f"Invalid input: {str(ve)}", "status": "failed"}), 400
     except Exception as e:
+        print("❌ Exception:", e)
         return jsonify({"error": str(e), "status": "failed"}), 500
+
 
 @app.route('/health', methods=['GET'])
 def health_check():
