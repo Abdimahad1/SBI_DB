@@ -18,6 +18,7 @@ const notificationsRoutes = require('./routes/NotificationsRoute');
 const interestedInvestorRoutes = require('./routes/interestedInvestorRoutes');
 const myInvestmentsRoutes = require('./routes/myInvestments');
 const businessProfileFormRoutes = require('./routes/businessProfileRoutesForm');
+const passwordResetRoutes = require('./routes/passwordResetRoutes');
 
 
 
@@ -49,6 +50,7 @@ app.use('/api/notification-settings', notificationSettingsRoutes);    // For set
 app.use('/api/real-notifications', notificationsRoutes); 
 app.use('/api/investors-interested', interestedInvestorRoutes);
 app.use('/api/my-investments', myInvestmentsRoutes);
+app.use('/api/password-reset', passwordResetRoutes);
 
 
 // Start Server
