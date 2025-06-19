@@ -5,8 +5,11 @@ const {
   createMyInvestment,
   getMyInvestments,
   updateStatusByInvestmentId,
-  getInvestmentById
+  getInvestmentById,
+  getInvestmentTrackData
 } = require('../controllers/myInvestmentController');
+router.get('/track/:investment_id', auth, getInvestmentTrackData);
+
 
 const MyInvestment = require('../models/MyInvestment'); // Needed for :id route
 
@@ -51,6 +54,7 @@ router.get('/test-connection', (req, res) => {
       'POST /',
       'GET /',
       'GET /by-investment',
+      'GET /track/:investment_id',
       'GET /by-investment-id/:id',
       'PATCH /update-status'
     ]

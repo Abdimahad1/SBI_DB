@@ -21,6 +21,24 @@ const MyInvestmentSchema = new mongoose.Schema({
   reason: String,
   goalAmount: Number,
   currentContribution: Number,
+  totalRaised: {
+    type: Number,
+    default: 0
+  },
+  interestedCount: {
+    type: Number,
+    default: 0
+  },
+  investors: [
+    {
+      investorId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      amount: Number,
+      date: Date
+    }
+  ],
   status: {
     type: String,
     enum: ['pending', 'accepted', 'rejected'],
