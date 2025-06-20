@@ -24,8 +24,8 @@ const BusinessProfileFormSchema = new mongoose.Schema({
     required: true 
   },
   city: { type: String, required: true },
-  fundingTotalUSD: { type: Number, required: true },
-  fundingRounds: { type: Number, required: true },
+  fundingTotalUSD: { type: Number },
+  fundingRounds: { type: Number },
   seedFunding: { type: Number, default: 0 },
   ventureFunding: { type: Number, default: 0 },
   angelFunding: { type: Number, default: 0 },
