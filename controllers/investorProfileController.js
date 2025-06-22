@@ -1,10 +1,10 @@
-const BusinessProfile = require('../models/BusinessProfile');
+const InvestorProfile = require('../models/InvestorProfile');
 
 exports.getProfile = async (req, res) => {
   try {
-    const profile = await BusinessProfile.findOne({ user_id: req.userId });
+    const profile = await InvestorProfile.findOne({ user_id: req.userId });
     if (!profile) {
-      return res.status(404).json({ message: 'Business profile not found' });
+      return res.status(404).json({ message: 'Investor profile not found' });
     }
     res.json(profile);
   } catch (err) {
@@ -24,7 +24,7 @@ exports.updateProfile = async (req, res) => {
       updateData.logo = req.file.filename;
     }
 
-    const profile = await BusinessProfile.findOneAndUpdate(
+    const profile = await InvestorProfile.findOneAndUpdate(
       { user_id: req.userId },
       { $set: updateData },
       { new: true, upsert: true }

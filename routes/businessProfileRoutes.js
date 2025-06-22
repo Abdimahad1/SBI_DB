@@ -1,16 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middlewares/authMiddleware');
+const { checkBusinessOwner } = require('../middlewares/roleMiddleware');
 const upload = require('../middlewares/uploadMiddleware');
 const {
   getProfile,
   updateProfile
 } = require('../controllers/businessProfileController');
-const BusinessProfile = require('../models/BusinessProfile');
 
-// Authenticated routes
-router.get('/', auth, getProfile);
-router.put('/', auth, upload.single('logo'), updateProfile);
+// Authenticated routes - Business Owner only
+router.get('/', auth, checkBusinessOwner, getProfile);
+router.put('/', auth, checkBusinessOwner, upload.single('logo'), updateProfile);
 
 // Public route to get a business profile by user_id
 router.get('/public/:userId', async (req, res) => {
