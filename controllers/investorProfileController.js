@@ -1,5 +1,6 @@
 const InvestorProfile = require('../models/InvestorProfile');
 
+// ✅ GET Investor Profile
 exports.getProfile = async (req, res) => {
   try {
     const profile = await InvestorProfile.findOne({ user_id: req.userId });
@@ -12,12 +13,14 @@ exports.getProfile = async (req, res) => {
   }
 };
 
+// ✅ UPDATE Investor Profile
 exports.updateProfile = async (req, res) => {
   try {
     const updateData = { 
-      business_name: req.body.business_name,
-      location: req.body.location,
-      business_email: req.body.business_email
+      investor_name: req.body.investor_name,
+      investor_location: req.body.investor_location,
+      investor_email: req.body.investor_email,
+      investor_website: req.body.investor_website || ''
     };
 
     if (req.file) {

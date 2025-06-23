@@ -7,10 +7,13 @@ const InvestorProfileSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
-  business_name: { type: String, required: true },
-  location: { type: String, required: true },
-  business_email: { type: String, required: true },
+  investor_name: { type: String, required: true },
+  investor_location: { type: String, required: true },
+  investor_email: { type: String, required: true },
+  investor_website: { type: String }, // optional
   logo: { type: String }
 }, { timestamps: true });
+
+InvestorProfileSchema.index({ user_id: 1 }, { unique: true });
 
 module.exports = mongoose.model('InvestorProfile', InvestorProfileSchema);

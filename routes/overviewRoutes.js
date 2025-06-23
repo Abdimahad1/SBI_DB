@@ -20,14 +20,10 @@ router.get('/all', async (req, res) => {
   }
 });
 
+
 // ✅ Secure admin route to get overviews with business names
 router.get('/all-profiles', auth, async (req, res) => {
   try {
-    // Optional admin check
-    // if (req.user.role !== 'admin') {
-    //   return res.status(403).json({ message: 'Access denied. Admins only.' });
-    // }
-
     const overviews = await Overview.find({});
     const profiles = await BusinessProfile.find({});
 
@@ -47,24 +43,28 @@ router.get('/all-profiles', auth, async (req, res) => {
   }
 });
 
-// ✅ NEW: Public ML-accessible route with secret key
+// ✅ Public ML-accessible route — merged into 1 clean route
 router.get('/all-profiles-public', async (req, res) => {
   try {
     const secret = req.query.secret;
-    if (secret !== process.env.ML_SECRET_KEY) {
+    if (secret !== process.env.ML_SECRET_KEY && secret !== process.env.ML_API_SECRET) {
       return res.status(403).json({ message: 'Unauthorized ML access' });
     }
 
-    const overviews = await Overview.find({});
-    const profiles = await BusinessProfile.find({});
+    const overviews = await Overview.aggregate([
+      { $sort: { createdAt: -1 } },
+      { $group: { _id: "$user_id", doc: { $first: "$$ROOT" } } },
+      { $replaceRoot: { newRoot: "$doc" } }
+    ]);
 
+    const profiles = await BusinessProfile.find({});
     const profileMap = {};
     profiles.forEach(profile => {
       profileMap[profile.user_id.toString()] = profile.business_name;
     });
 
     const merged = overviews.map(o => ({
-      ...o.toObject(),
+      ...o,
       business_name: profileMap[o.user_id.toString()] || ''
     }));
 
@@ -74,34 +74,7 @@ router.get('/all-profiles-public', async (req, res) => {
   }
 });
 
-// ✅ Public route to get overview + business_name without auth (for ML only)
-router.get('/all-profiles-public', async (req, res) => {
-  try {
-    const secret = req.query.secret;
-    if (secret !== process.env.ML_API_SECRET) {
-      return res.status(401).json({ message: 'Unauthorized request' });
-    }
-
-    const overviews = await Overview.find({});
-    const profiles = await BusinessProfile.find({});
-
-    const profileMap = {};
-    profiles.forEach(profile => {
-      profileMap[profile.user_id.toString()] = profile.business_name;
-    });
-
-    const merged = overviews.map(o => ({
-      ...o.toObject(),
-      business_name: profileMap[o.user_id.toString()] || ''
-    }));
-
-    res.json(merged);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// ✅ NEW: Get overview for a specific businessId (user_id)
+// ✅ Get overview for a specific businessId (user_id)
 router.get('/public/:id', async (req, res) => {
   try {
     const overview = await Overview.findOne({ user_id: req.params.id });
@@ -113,8 +86,6 @@ router.get('/public/:id', async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-
-
 
 // ✅ Authenticated routes for individual users
 router.post('/generate', auth, generateOverview);

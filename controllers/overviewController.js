@@ -4,6 +4,8 @@ const Product = require('../models/Product');
 // CREATE or UPDATE Overview
 exports.generateOverview = async (req, res) => {
   try {
+    console.log('➡️ Generating overview for user:', req.userId);
+
     const products = await Product.find({ user_id: req.userId });
 
     let expenses = 0;
@@ -16,26 +18,24 @@ exports.generateOverview = async (req, res) => {
       products_sold += prod.sold || 0;
     });
 
-    const existing = await Overview.findOne({ user_id: req.userId });
+    const updatedOverview = await Overview.findOneAndUpdate(
+      { user_id: req.userId },
+      {
+        $set: {
+          expenses,
+          income,
+          products_sold,
+          locations: 0,          // Optional — you can remove if you want
+          score_level: 'Beginner' // Optional — you can remove if you want
+        }
+      },
+      { new: true, upsert: true }
+    );
 
-    if (existing) {
-      existing.expenses = expenses;
-      existing.income = income;
-      existing.products_sold = products_sold;
-      await existing.save();
-      res.json(existing);
-    } else {
-      const overview = await Overview.create({
-        user_id: req.userId,
-        expenses,
-        income,
-        products_sold,
-        locations: 0,
-        score_level: 'Beginner'
-      });
-      res.status(201).json(overview);
-    }
+    console.log('✅ Overview upserted:', updatedOverview);
+    res.json(updatedOverview);
   } catch (err) {
+    console.error('❌ Error in generateOverview:', err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -43,12 +43,18 @@ exports.generateOverview = async (req, res) => {
 // GET Overview
 exports.getOverview = async (req, res) => {
   try {
+    console.log('➡️ Fetching overview for user:', req.userId);
+
     const overview = await Overview.findOne({ user_id: req.userId });
     if (!overview) {
+      console.warn('⚠️ Overview not found for user:', req.userId);
       return res.status(404).json({ message: 'Overview not found.' });
     }
+
+    console.log('✅ Overview found:', overview);
     res.json(overview);
   } catch (err) {
+    console.error('❌ Error in getOverview:', err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -56,15 +62,25 @@ exports.getOverview = async (req, res) => {
 // UPDATE Locations or Score
 exports.updateOverview = async (req, res) => {
   try {
+    console.log('➡️ Updating locations/score for user:', req.userId);
+
     const { locations, score_level } = req.body;
+
     const updated = await Overview.findOneAndUpdate(
       { user_id: req.userId },
       { $set: { locations, score_level } },
       { new: true }
     );
-    if (!updated) return res.status(404).json({ message: 'Overview not found.' });
+
+    if (!updated) {
+      console.warn('⚠️ Overview not found for update:', req.userId);
+      return res.status(404).json({ message: 'Overview not found.' });
+    }
+
+    console.log('✅ Overview updated:', updated);
     res.json(updated);
   } catch (err) {
+    console.error('❌ Error in updateOverview:', err);
     res.status(500).json({ message: err.message });
   }
 };

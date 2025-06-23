@@ -1,6 +1,7 @@
 const Investment = require('../models/Investment');
 const InterestedInvestor = require('../models/InterestedInvestor');
 const MyInvestment = require('../models/MyInvestment');
+const ProfileForm = require('../models/BusinessProfileForm');
 const Notification = require('../models/Notification');
 
 exports.createInterestedInvestor = async (req, res) => {
@@ -19,21 +20,21 @@ exports.createInterestedInvestor = async (req, res) => {
 
     const user_id = req.userId;
 
-    // ✅ Validate that the investment exists in the Investment model
+    // ✅ Validate that the investment exists
     const investment = await Investment.findById(investment_id);
     if (!investment) {
       return res.status(404).json({ message: 'Investment not found' });
     }
 
-    // ✅ Create InterestedInvestor entry (saves investor profile image only)
+    // ✅ Create InterestedInvestor entry
     const interestedInvestor = await InterestedInvestor.create({
       investment_id,
       user_id,
-      businessId: investment.user_id, // business owner's ID
+      businessId: investment.user_id,
       name,
       email,
       message,
-      image, // investor profile image
+      image,
       title,
       purpose,
       goalAmount,
@@ -49,10 +50,9 @@ exports.createInterestedInvestor = async (req, res) => {
   }
 };
 
-// GET interested investors for current business owner
 exports.getInterestedInvestors = async (req, res) => {
   try {
-    const userId = req.userId; // this is the business owner's ID
+    const userId = req.userId;
     const investments = await InterestedInvestor.find({ businessId: userId });
     res.status(200).json(investments);
   } catch (err) {
@@ -69,27 +69,90 @@ exports.updateInvestorStatus = async (req, res) => {
       return res.status(400).json({ message: 'investment_id and status are required' });
     }
 
-    const updatedInvestment = await MyInvestment.findOneAndUpdate(
-      { investment_id },
-      { status },
-      { new: true }
-    );
-
-    if (!updatedInvestment) {
-      return res.status(404).json({ message: 'Investment not found' });
+    // 1️⃣ Update MyInvestment first
+    const myInvestment = await MyInvestment.findOne({ investment_id });
+    if (!myInvestment) {
+      return res.status(404).json({ message: 'MyInvestment not found' });
     }
 
+    const previousStatus = myInvestment.status;
+    myInvestment.status = status;
+    await myInvestment.save();
+
+    // 2️⃣ Update parent Investment and ProfileForm
+    const parentInvestment = await Investment.findById(investment_id);
+
+    if (parentInvestment) {
+      let invUpdate = {};
+      let profileIncValue = 0;
+
+      if (status === 'accepted' && previousStatus !== 'accepted') {
+        invUpdate = { $inc: { currentContribution: myInvestment.currentContribution } };
+        profileIncValue = myInvestment.currentContribution;
+        console.log(`✅ +$${myInvestment.currentContribution} → Investment + ProfileForm`);
+      } else if (status === 'rejected' && previousStatus === 'accepted') {
+        invUpdate = { $inc: { currentContribution: -myInvestment.currentContribution } };
+        profileIncValue = -myInvestment.currentContribution;
+        console.log(`✅ -$${myInvestment.currentContribution} → Investment + ProfileForm`);
+      }
+
+      // Update Investment
+      if (Object.keys(invUpdate).length > 0) {
+        await Investment.updateOne(
+          { _id: investment_id },
+          invUpdate
+        );
+      }
+
+      // Update ProfileForm (safe: convert null to 0)
+      if (profileIncValue !== 0) {
+        const profileDoc = await ProfileForm.findOne({ user_id: parentInvestment.user_id });
+
+        if (profileDoc) {
+          // Fix null → 0
+          if (profileDoc.fundingTotalUSD == null) {
+            profileDoc.fundingTotalUSD = 0;
+          }
+
+          profileDoc.fundingTotalUSD += profileIncValue;
+          await profileDoc.save();
+
+          console.log(`✅ ProfileForm updated: fundingTotalUSD = ${profileDoc.fundingTotalUSD}`);
+        } else {
+          // No profile → insert new
+          await ProfileForm.create({
+            user_id: parentInvestment.user_id,
+            fundingTotalUSD: Math.max(profileIncValue, 0),
+            fundingRounds: 0
+          });
+          console.log(`✅ ProfileForm created with fundingTotalUSD = ${profileIncValue}`);
+        }
+      }
+
+    } else {
+      console.warn('⚠️ Parent Investment not found for:', investment_id);
+    }
+
+    // 3️⃣ Update InterestedInvestor
     const interestedInvestors = await InterestedInvestor.find({ investment_id });
 
     for (const investor of interestedInvestors) {
-      await Notification.create({
-        user_id: investor.user_id,
-        title: 'Investment Status Update',
-        message: `Your investment in "${updatedInvestment.title}" has been ${status}.`,
-      });
+      investor.status = status;
+      await investor.save();
+
+      // 4️⃣ Send notification
+      try {
+        await Notification.create({
+          user_id: investor.user_id,
+          title: 'Investment Status Update',
+          message: `Your investment in "${myInvestment.title}" has been ${status}.`,
+        });
+      } catch (notifyErr) {
+        console.error(`Failed to notify investor ${investor.user_id}:`, notifyErr);
+      }
     }
 
-    res.json({ success: true, updatedInvestment });
+    res.json({ success: true, myInvestment, updatedCount: interestedInvestors.length });
   } catch (err) {
     console.error('❌ Failed to update investor status:', err);
     res.status(500).json({ message: err.message });
