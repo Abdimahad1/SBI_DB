@@ -5,11 +5,16 @@ const {
   login,
   getMe,
   updateUser,
-  partialUpdateUser
+  partialUpdateUser,
+  adminLogin,
+  getAllUsers,
+  getUserCount
 } = require('../controllers/authController'); // ✅ Import them all
 
 const authMiddleware = require('../middlewares/authMiddleware');
-
+router.get('/user-count', authMiddleware, getUserCount);
+router.get('/all-users', authMiddleware, getAllUsers);
+router.post('/admin-login', adminLogin);
 router.post('/signup', signup);
 router.post('/login', login);
 router.get('/users', authMiddleware, getMe);

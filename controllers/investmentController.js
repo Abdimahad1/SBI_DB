@@ -107,3 +107,13 @@ exports.getInvestmentById = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+
+exports.getInvestmentCount = async (req, res) => {
+  try {
+    const count = await Investment.countDocuments();
+    res.json({ count });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

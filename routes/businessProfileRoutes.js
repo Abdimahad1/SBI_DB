@@ -14,6 +14,14 @@ const BusinessProfile = require('../models/BusinessProfile'); // you missed this
 // ✅ Authenticated routes - Business Owner only
 router.get('/', auth, checkBusinessOwner, getProfile);
 router.put('/', auth, checkBusinessOwner, upload.single('logo'), updateProfile);
+router.get('/count', auth, async (req, res) => {
+  try {
+    const count = await BusinessProfile.countDocuments();
+    res.json({ count });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 // ✅ Public route to get a business profile by user_id (safe ObjectId conversion)
 router.get('/public/:userId', async (req, res) => {

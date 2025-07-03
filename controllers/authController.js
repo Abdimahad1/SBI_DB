@@ -1,10 +1,18 @@
+// controllers/authController.js
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-// Register a new user
+// Register a new user (public signup)
 exports.signup = async (req, res) => {
   const { name, phone, email, password, role } = req.body;
+
+  // ✅ Block public signup as admin
+  if (role === "Admin") {
+    return res.status(403).json({
+      message: "Cannot register Admin role through public signup"
+    });
+  }
 
   try {
     const existingEmail = await User.findOne({ email });
@@ -33,15 +41,15 @@ exports.signup = async (req, res) => {
   }
 };
 
-// Login an existing user
+// Login for Investor/BusinessOwner
 exports.login = async (req, res) => {
-  const { email, password, role } = req.body; // ✅ frontend must send role
+  const { email, password, role } = req.body;
 
   try {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // ✅ Ensure role matches
+    // ✅ Check role match
     if (user.role !== role) {
       return res.status(403).json({
         message: `Role mismatch! Please select the correct role to log in.`
@@ -54,7 +62,7 @@ exports.login = async (req, res) => {
     const token = jwt.sign(
       { id: user._id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: '1d' }
+      { expiresIn: "1d" }
     );
 
     res.json({
@@ -75,8 +83,8 @@ exports.login = async (req, res) => {
 // Get current authenticated user's info
 exports.getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.userId).select('-password');
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    const user = await User.findById(req.userId).select("-password");
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     res.json(user);
   } catch (err) {
@@ -137,6 +145,60 @@ exports.partialUpdateUser = async (req, res) => {
 
     await user.save();
     res.json({ message: "User updated successfully", name: user.name });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Admin-specific login
+exports.adminLogin = async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (user.role !== "Admin") {
+      return res.status(403).json({ message: "Unauthorized role" });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
+
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Get all users (for admin)
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find().select('-password');
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.getUserCount = async (req, res) => {
+  try {
+    const count = await User.countDocuments();
+    res.json({ count });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -6,7 +6,11 @@ const UserSchema = new mongoose.Schema({
   phone: String,
   email: { type: String, unique: true },
   password: String,
-  role: { type: String, enum: ['Investor', 'BusinessOwner'], required: true },
+  role: { 
+    type: String, 
+    enum: ['Investor', 'BusinessOwner', 'Admin'], // added Admin
+    required: true 
+  },
   resetPasswordToken: String,
   resetPasswordExpire: Date,
   otp: String,
