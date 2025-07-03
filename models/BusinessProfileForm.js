@@ -20,12 +20,12 @@ const BusinessProfileFormSchema = new mongoose.Schema({
   },
   countryCode: { 
     type: String, 
-    enum: ['SOM', 'USA', 'CAN', 'AUS', 'DEN', 'FRA', 'JAP','UK', 'OTHER'],
+    enum: ['SOM', 'USA', 'CAN', 'AUS', 'DEN', 'FRA', 'JAP', 'UK', 'OTHER'],
     required: true 
   },
   city: { type: String, required: true },
-  fundingTotalUSD: { type: Number },
-  fundingRounds: { type: Number },
+  fundingTotalUSD: { type: Number, default: 0 },
+  fundingRounds: { type: Number, default: 0 }, // ✅ added default
   seedFunding: { type: Number, default: 0 },
   ventureFunding: { type: Number, default: 0 },
   angelFunding: { type: Number, default: 0 },
@@ -40,6 +40,6 @@ const BusinessProfileFormSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Check if the model is already defined
 const BusinessProfileForm = mongoose.models.BusinessProfileForm || mongoose.model('BusinessProfileForm', BusinessProfileFormSchema);
+
 module.exports = BusinessProfileForm;

@@ -20,7 +20,6 @@ exports.createMyInvestment = async (req, res) => {
 
     const investorId = req.userId;
 
-    // ✅ Duplicate check
     const exists = await MyInvestment.findOne({ investorId, investment_id });
     if (exists) {
       return res.status(409).json({ message: 'You already have this investment saved.' });
@@ -36,16 +35,16 @@ exports.createMyInvestment = async (req, res) => {
       reason,
       goalAmount,
       currentContribution,
-      totalRaised: 0,  // ✅ initial
+      totalRaised: 0,
       interestedCount: 0,
       investors: [],
       status: 'pending'
     });
 
-    res.status(201).json(newInvestment);
+    res.status(201).json({ success: true, data: newInvestment });
   } catch (err) {
-    console.error('❌ Failed to create investment:', err);
-    res.status(500).json({ message: err.message });
+    console.error('❌ Failed to create investment:', err.message, err.stack);
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
@@ -53,176 +52,233 @@ exports.createMyInvestment = async (req, res) => {
 exports.getMyInvestments = async (req, res) => {
   try {
     const myInvestments = await MyInvestment.find({ investorId: req.userId });
-    res.json(myInvestments);
+    res.json({ success: true, data: myInvestments });
   } catch (err) {
-    console.error('❌ Get Investments Error:', err);
-    res.status(500).json({ message: 'Failed to fetch investments', error: err.message });
+    console.error('❌ Get Investments Error:', err.message, err.stack);
+    res.status(500).json({ success: false, message: 'Failed to fetch investments', error: err.message });
   }
 };
 
-// PATCH: Update investment status using investment_id
+// PATCH: update investment status
 exports.updateStatusByInvestmentId = async (req, res) => {
   const { investment_id, status } = req.body;
 
   if (!investment_id || !status) {
-    return res.status(400).json({ message: 'Missing investment_id or status' });
+    return res.status(400).json({ success: false, message: "Missing investment_id or status" });
   }
 
   try {
-    const investment = await MyInvestment.findOne({ investment_id });
+    console.log(`🔵 Status change received: investment_id=${investment_id}, status=${status}`);
 
+    // 1️⃣ Get the MyInvestment record
+    const investment = await MyInvestment.findOne({ investment_id });
     if (!investment) {
-      return res.status(404).json({ message: 'Investment not found' });
+      console.warn(`❌ MyInvestment not found for investment_id=${investment_id}`);
+      return res.status(404).json({ success: false, message: "Investment not found" });
     }
 
     const previousStatus = investment.status;
     const currentContribution = investment.currentContribution || 0;
     const businessId = investment.businessId;
 
-    // Update the investment status
+    console.log(`🔵 Found MyInvestment with previousStatus=${previousStatus}, currentContribution=${currentContribution}`);
+
     investment.status = status;
     await investment.save();
 
-    // --- Update BusinessProfileForm.fundingTotalUSD ---
+    // 2️⃣ Get the BusinessProfileForm
     const profile = await BusinessProfileForm.findOne({ user_id: businessId });
-
-    if (profile) {
-      let update = {};
-
-      if (status === 'accepted' && previousStatus !== 'accepted') {
-        update = { $inc: { fundingTotalUSD: currentContribution } };
-        console.log(`✅ Added $${currentContribution} to fundingTotalUSD`);
-      } else if (status === 'rejected' && previousStatus === 'accepted') {
-        update = { $inc: { fundingTotalUSD: -currentContribution } };
-        console.log(`✅ Subtracted $${currentContribution} from fundingTotalUSD`);
-      }
-
-      if (Object.keys(update).length > 0) {
-        await BusinessProfileForm.updateOne(
-          { user_id: businessId },
-          update
-        );
-      }
-    } else {
-      console.warn('⚠️ Business profile not found for user_id:', businessId);
+    if (!profile) {
+      console.warn(`⚠️ BusinessProfileForm not found for user_id=${businessId}`);
+      return res.status(404).json({ success: false, message: "Business profile not found" });
     }
 
-    // --- Update Investment.currentContribution ---
+    // 3️⃣ Decide which funding field to increment
+    const fundingSequence = [
+      "seedFunding", "angelFunding", "ventureFunding", "convertibleNote",
+      "equityCrowdfunding", "debtFinancing", "privateEquity", "postIpoEquity"
+    ];
+
+    const currentRoundIndex = profile.fundingRounds || 0;
+    const fundingTypeField = fundingSequence[
+      Math.min(currentRoundIndex, fundingSequence.length - 1)
+    ] || "seedFunding";
+
+    console.log(`✅ fundingTypeField selected: ${fundingTypeField}`);
+
+    // 4️⃣ Build the increment update
+    const update = {};
+
+    if (status === "accepted" && previousStatus !== "accepted") {
+      update.$inc = {
+        fundingTotalUSD: currentContribution,
+        [fundingTypeField]: currentContribution
+      };
+
+      // fundingRounds check
+      const parentInvestment = await Investment.findOne({ _id: investment_id });
+      if (parentInvestment) {
+        const totalRaisedAfter = (parentInvestment.currentContribution || 0) + currentContribution;
+        if (totalRaisedAfter >= parentInvestment.goalAmount) {
+          update.$inc.fundingRounds = 1;
+          console.log(`✅ fundingRounds increment triggered to ${profile.fundingRounds + 1}`);
+        }
+      }
+    }
+    else if (status === "rejected" && previousStatus === "accepted") {
+      // rollback
+      const investorEntry = investment.investors.find(
+        inv => inv.investorId.toString() === investment.investorId.toString()
+      );
+      update.$inc = {
+        fundingTotalUSD: -currentContribution,
+      };
+      if (investorEntry && investorEntry.fundingType) {
+        update.$inc[investorEntry.fundingType] = -currentContribution;
+      }
+      console.log(`✅ Rollback applied:`, update.$inc);
+    }
+
+    // 5️⃣ Actually apply update to the BusinessProfileForm
+    if (Object.keys(update).length > 0) {
+      console.log(`🔵 Applying BusinessProfileForm update:`, update.$inc);
+
+      const updatedProfile = await BusinessProfileForm.findOneAndUpdate(
+        { user_id: businessId },
+        update,
+        { new: true }
+      );
+
+      if (updatedProfile) {
+        console.log(`✅ Profile updated:
+          fundingTotalUSD=${updatedProfile.fundingTotalUSD}
+          fundingRounds=${updatedProfile.fundingRounds}
+          ${fundingTypeField}=${updatedProfile[fundingTypeField]}
+        `);
+      } else {
+        console.warn(`⚠️ BusinessProfileForm update returned null`);
+      }
+    }
+
+    // 6️⃣ Also update Investment doc itself
     const parentInvestment = await Investment.findOne({ _id: investment_id });
-
     if (parentInvestment) {
-      let invUpdate = {};
-
-      if (status === 'accepted' && previousStatus !== 'accepted') {
-        invUpdate = { $inc: { currentContribution: currentContribution } };
-        console.log(`✅ Added $${currentContribution} to Investment.currentContribution`);
-      } else if (status === 'rejected' && previousStatus === 'accepted') {
-        invUpdate = { $inc: { currentContribution: -currentContribution } };
-        console.log(`✅ Subtracted $${currentContribution} from Investment.currentContribution`);
+      const invUpdate = {};
+      if (status === "accepted" && previousStatus !== "accepted") {
+        invUpdate.$inc = { currentContribution: currentContribution };
+      } else if (status === "rejected" && previousStatus === "accepted") {
+        invUpdate.$inc = { currentContribution: -currentContribution };
       }
-
       if (Object.keys(invUpdate).length > 0) {
-        await Investment.updateOne(
-          { _id: investment_id },
-          invUpdate
-        );
+        console.log(`🔵 Applying Investment doc update:`, invUpdate.$inc);
+        await Investment.updateOne({ _id: investment_id }, invUpdate);
       }
-    } else {
-      console.warn('⚠️ Investment not found for _id:', investment_id);
     }
 
-    // --- Update MyInvestment progress ---
-    if (status === 'accepted' && previousStatus !== 'accepted') {
+    // 7️⃣ push to MyInvestment investors array
+    if (status === "accepted" && previousStatus !== "accepted") {
       investment.totalRaised += currentContribution;
       investment.interestedCount += 1;
       investment.investors.push({
         investorId: investment.investorId,
         amount: currentContribution,
-        date: new Date()
+        date: new Date(),
+        fundingType: fundingTypeField
       });
-
       await investment.save();
-      console.log(`✅ Updated MyInvestment progress`);
+      console.log(`✅ MyInvestment investors array updated with fundingType=${fundingTypeField}`);
     }
 
-    // --- Notify interested investors ---
+    // 8️⃣ send notifications
     const interestedInvestors = await InterestedInvestor.find({ investment_id });
     for (const investor of interestedInvestors) {
       await Notification.create({
         user_id: investor.user_id,
-        title: 'Investment Status Update',
-        message: `Your investment in "${investment.title}" has been ${status}.`,
+        title: "Investment Status Update",
+        message: `Your investment in "${investment.title}" has been ${status}.`
       });
     }
 
-    res.json({ success: true, investment });
+    // 9️⃣ respond
+    res.json({
+      success: true,
+      data: investment
+    });
+
   } catch (err) {
-    console.error('Update status error:', err);
-    res.status(500).json({ message: 'Failed to update status' });
+    console.error(`❌ updateStatusByInvestmentId error:`, err.message, err.stack);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update investment status",
+      error: err.message
+    });
   }
 };
 
-// GET investment by query param ?investment_id=abc
+
+// GET investment by query param
 exports.getInvestmentById = async (req, res) => {
   try {
     const { investment_id } = req.query;
     if (!investment_id) {
-      return res.status(400).json({ message: 'investment_id is required' });
+      return res.status(400).json({ success: false, message: 'investment_id is required' });
     }
 
     const investment = await MyInvestment.findOne({ investment_id });
     if (!investment) {
-      return res.status(404).json({ message: 'Investment not found' });
+      return res.status(404).json({ success: false, message: 'Investment not found' });
     }
 
-    res.json([investment]); // Return as array for consistency
+    res.json({ success: true, data: investment });
   } catch (err) {
-    console.error('Get Investment Error:', err);
-    res.status(500).json({ message: err.message });
+    console.error('Get Investment Error:', err.message, err.stack);
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Check if investment exists for current investor
+// check if investment exists
 exports.checkInvestmentExists = async (req, res) => {
   try {
     const investorId = req.userId;
     const { investment_id } = req.query;
 
     if (!investment_id) {
-      return res.status(400).json({ message: 'investment_id is required' });
+      return res.status(400).json({ success: false, message: 'investment_id is required' });
     }
 
     const exists = await MyInvestment.findOne({ investorId, investment_id });
-
-    res.json({ exists: !!exists });
+    res.json({ success: true, exists: !!exists });
   } catch (err) {
-    console.error('Check investment exists error:', err);
-    res.status(500).json({ message: 'Failed to check investment existence' });
+    console.error('Check investment exists error:', err.message, err.stack);
+    res.status(500).json({ success: false, message: 'Failed to check investment existence' });
   }
 };
 
-// 🚀 GET /my-investments/track/:investment_id
+// get track data
 exports.getInvestmentTrackData = async (req, res) => {
   try {
     const investment = await MyInvestment.findOne({
       investment_id: req.params.investment_id,
-      investorId: req.userId // ✅ only your investment
+      investorId: req.userId
     });
 
     if (!investment) {
-      return res.status(404).json({ message: 'Investment not found' });
+      return res.status(404).json({ success: false, message: 'Investment not found' });
     }
 
     res.json({
-      goalAmount: investment.goalAmount,
-      totalRaised: investment.totalRaised,
-      percentFunded: Math.min(100, Math.round((investment.totalRaised / investment.goalAmount) * 100)),
-      myContribution: investment.currentContribution,
-      investors: investment.investors || [],
-      interestedCount: investment.interestedCount
+      success: true,
+      data: {
+        goalAmount: investment.goalAmount,
+        totalRaised: investment.totalRaised,
+        percentFunded: Math.min(100, Math.round((investment.totalRaised / investment.goalAmount) * 100)),
+        myContribution: investment.currentContribution,
+        investors: investment.investors || [],
+        interestedCount: investment.interestedCount
+      }
     });
   } catch (err) {
-    console.error('Track Investment Error:', err);
-    res.status(500).json({ message: err.message });
+    console.error('Track Investment Error:', err.message, err.stack);
+    res.status(500).json({ success: false, message: err.message });
   }
 };
