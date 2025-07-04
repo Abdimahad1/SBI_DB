@@ -117,3 +117,44 @@ exports.getInvestmentCount = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+// GET investment statistics for admin dashboard
+exports.getInvestmentStats = async (req, res) => {
+  try {
+    const total = await Investment.countDocuments();
+
+    // You might have a `status` field in MyInvestment, but since
+    // your Investment model does not yet have a `status`,
+    // we will assume all are “pending” if you wish, or
+    // you can later integrate MyInvestment counts.
+
+    // for now:
+    const pending = 0;
+    const approved = 0;
+    const rejected = 0;
+
+    // if you want to integrate MyInvestment statuses, you can do:
+    const MyInvestment = require('../models/MyInvestment');
+
+    const pendingMy = await MyInvestment.countDocuments({ status: 'pending' });
+    const approvedMy = await MyInvestment.countDocuments({ status: 'accepted' });
+    const rejectedMy = await MyInvestment.countDocuments({ status: 'rejected' });
+
+    // simplified “investment growth” example
+    const investmentGrowth = 12.5; // static for now
+    const approvalGrowth = 8.3;     // static for now
+
+    res.json({
+      totalInvestments: total,
+      pendingInvestments: pendingMy,
+      approvedInvestments: approvedMy,
+      rejectedInvestments: rejectedMy,
+      investmentGrowth,
+      approvalGrowth
+    });
+  } catch (err) {
+    console.error("❌ Failed to get investment stats:", err.message);
+    res.status(500).json({ message: "Failed to get stats", error: err.message });
+  }
+};
+

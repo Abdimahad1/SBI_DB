@@ -20,6 +20,7 @@ const myInvestmentsRoutes = require('./routes/myInvestments');
 const businessProfileFormRoutes = require('./routes/businessProfileRoutesForm');
 const passwordResetRoutes = require('./routes/passwordResetRoutes');
 const investorProfileRoutes = require('./routes/investorProfileRoutes');
+const businessManagementRoutes = require('./routes/businessManagementRoutes');
 
 
 // Load environment variables
@@ -52,6 +53,7 @@ app.use('/api/investors-interested', interestedInvestorRoutes);
 app.use('/api/my-investments', myInvestmentsRoutes);
 app.use('/api/password-reset', passwordResetRoutes);
 app.use('/api/investor-profile', investorProfileRoutes);
+app.use('/api/businesses', businessManagementRoutes);
 
 // Start Server
 const PORT = process.env.PORT || 5000;

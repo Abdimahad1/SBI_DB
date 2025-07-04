@@ -7,7 +7,6 @@ const jwt = require('jsonwebtoken');
 exports.signup = async (req, res) => {
   const { name, phone, email, password, role } = req.body;
 
-  // ✅ Block public signup as admin
   if (role === "Admin") {
     return res.status(403).json({
       message: "Cannot register Admin role through public signup"
@@ -32,12 +31,55 @@ exports.signup = async (req, res) => {
       phone,
       email,
       password: hashedPassword,
-      role
+      role,
+      status: "active"
     });
 
     res.status(201).json({ message: "User registered successfully", newUser });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+// ✅ allow admin to create another admin
+exports.createAdmin = async (req, res) => {
+  try {
+    // check if current user is admin
+    if (req.userRole !== "Admin") {
+      return res.status(403).json({ message: "Only admins can create another admin." });
+    }
+
+    const { name, email, phone, password } = req.body;
+
+    const existingEmail = await User.findOne({ email });
+    if (existingEmail) {
+      return res.status(400).json({ message: "Email already exists." });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newAdmin = await User.create({
+      name,
+      email,
+      phone,
+      password: hashedPassword,
+      role: "Admin",
+      status: "active"
+    });
+
+    res.status(201).json({
+      message: "Admin created successfully",
+      user: {
+        id: newAdmin._id,
+        name: newAdmin.name,
+        email: newAdmin.email,
+        phone: newAdmin.phone,
+        role: newAdmin.role
+      }
+    });
+  } catch (err) {
+    console.error("Error creating admin", err);
+    res.status(500).json({ message: "Failed to create admin." });
   }
 };
 
@@ -49,11 +91,14 @@ exports.login = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // ✅ Check role match
     if (user.role !== role) {
       return res.status(403).json({
         message: `Role mismatch! Please select the correct role to log in.`
       });
+    }
+
+    if (user.status === "blocked") {
+      return res.status(403).json({ message: "Your account has been blocked." });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -72,7 +117,8 @@ exports.login = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        phone: user.phone
+        phone: user.phone,
+        status: user.status
       }
     });
   } catch (err) {
@@ -100,7 +146,8 @@ exports.updateUser = async (req, res) => {
       {
         name: req.body.name,
         phone: req.body.phone,
-        role: req.body.role
+        role: req.body.role,
+        status: req.body.status
       },
       { new: true }
     );
@@ -162,6 +209,10 @@ exports.adminLogin = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized role" });
     }
 
+    if (user.status === "blocked") {
+      return res.status(403).json({ message: "Your account has been blocked." });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
@@ -177,7 +228,8 @@ exports.adminLogin = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        status: user.status
       }
     });
   } catch (err) {
@@ -195,11 +247,102 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
+// Get user count
 exports.getUserCount = async (req, res) => {
   try {
     const count = await User.countDocuments();
     res.json({ count });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+// Block a user
+exports.blockUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { status: "blocked" },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "User blocked successfully", user });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Unblock a user
+exports.unblockUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { status: "active" },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "User unblocked successfully", user });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Get recent user registrations
+exports.getRecentRegistrations = async (req, res) => {
+  try {
+    const recentUsers = await User.find()
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .select('name email avatar role createdAt');
+
+    res.json(recentUsers);
+  } catch (err) {
+    console.error("Error fetching recent registrations:", err);
+    res.status(500).json({ message: "Failed to fetch recent registrations." });
+  }
+};
+
+// GET user growth grouped by month
+exports.getUserGrowth = async (req, res) => {
+  try {
+    // group users created in each month
+    const growth = await User.aggregate([
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            month: { $month: "$createdAt" },
+          },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { "_id.year": 1, "_id.month": 1 }
+      }
+    ]);
+
+    // transform to simpler frontend shape
+    const formatted = growth.map(item => ({
+      year: item._id.year,
+      month: item._id.month,
+      count: item.count
+    }));
+
+    res.json(formatted);
+  } catch (err) {
+    console.error("❌ Failed to get user growth:", err.message);
+    res.status(500).json({ message: "Failed to get user growth", error: err.message });
   }
 };

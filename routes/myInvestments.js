@@ -1,37 +1,43 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middlewares/authMiddleware'); // ✅ You exported default, so this is correct
+const auth = require('../middlewares/authMiddleware');
+
 const {
   createMyInvestment,
   getMyInvestments,
+  getAllMyInvestments,           // NEW controller to list all investments for admin
   updateStatusByInvestmentId,
   getInvestmentById,
   getInvestmentTrackData
 } = require('../controllers/myInvestmentController');
-router.get('/track/:investment_id', auth, getInvestmentTrackData);
 
+const MyInvestment = require('../models/MyInvestment');
 
-const MyInvestment = require('../models/MyInvestment'); // Needed for :id route
-
-// Logging middleware (optional for debug)
+// ✅ Logging for debug
 router.use((req, res, next) => {
   console.log(`[MyInvestments] ${req.method} ${req.path}`);
   next();
 });
 
-// Create new investment (Investor -> Business)
+// CREATE new investment (investor to business)
 router.post('/', auth, createMyInvestment);
 
-// Get all investments for current investor
+// GET all investments for current investor
 router.get('/', auth, getMyInvestments);
 
-// Update investment status using investment_id
-router.patch('/update-status', auth, updateStatusByInvestmentId);
+// ✅ NEW: GET all investments for admin/dashboard table
+router.get('/all', auth, getAllMyInvestments);
 
-// Get investment using ?investment_id=abc
+// GET investment details by investment_id query param
 router.get('/by-investment', auth, getInvestmentById);
 
-// Get investment by path param :id
+// PATCH update status (accepted/rejected)
+router.patch('/update-status', auth, updateStatusByInvestmentId);
+
+// GET track data (for progress bars)
+router.get('/track/:investment_id', auth, getInvestmentTrackData);
+
+// GET by path param (legacy fallback)
 router.get('/by-investment-id/:id', auth, async (req, res) => {
   try {
     const investment = await MyInvestment.findOne({ investment_id: req.params.id });
@@ -45,7 +51,7 @@ router.get('/by-investment-id/:id', auth, async (req, res) => {
   }
 });
 
-// Optional: test route
+// Test connection
 router.get('/test-connection', (req, res) => {
   res.json({
     success: true,
@@ -53,10 +59,11 @@ router.get('/test-connection', (req, res) => {
     available: [
       'POST /',
       'GET /',
+      'GET /all',                   // added new
       'GET /by-investment',
+      'PATCH /update-status',
       'GET /track/:investment_id',
-      'GET /by-investment-id/:id',
-      'PATCH /update-status'
+      'GET /by-investment-id/:id'
     ]
   });
 });

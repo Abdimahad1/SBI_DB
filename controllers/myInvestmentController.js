@@ -282,3 +282,19 @@ exports.getInvestmentTrackData = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// GET all MyInvestments for admin to monitor
+exports.getAllMyInvestments = async (req, res) => {
+  try {
+    const investments = await MyInvestment.find()
+      .populate("investorId", "name email")  // get investor name
+      .populate("businessId", "name email")  // get business name
+      .sort({ createdAt: -1 });
+
+    res.json(investments);
+  } catch (err) {
+    console.error("Failed to get all myinvestments:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+

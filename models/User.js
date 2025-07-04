@@ -1,4 +1,3 @@
-// models/User.js
 const mongoose = require('mongoose');
 
 const UserSchema = new mongoose.Schema({
@@ -8,8 +7,17 @@ const UserSchema = new mongoose.Schema({
   password: String,
   role: { 
     type: String, 
-    enum: ['Investor', 'BusinessOwner', 'Admin'], // added Admin
+    enum: ['Investor', 'BusinessOwner', 'Admin'], 
     required: true 
+  },
+  status: {
+    type: String,
+    enum: ['active', 'blocked'],
+    default: 'active'
+  },
+  avatar: { 
+    type: String, 
+    default: ""   // allow user profile pictures later
   },
   resetPasswordToken: String,
   resetPasswordExpire: Date,
