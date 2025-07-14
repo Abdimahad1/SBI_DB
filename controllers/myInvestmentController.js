@@ -59,7 +59,75 @@ exports.getMyInvestments = async (req, res) => {
   }
 };
 
-// PATCH: update investment status
+// UPDATE business profile funding information
+exports.updateBusinessFunding = async (req, res) => {
+  try {
+    const { user_id } = req.user;
+    const fundingData = req.body;
+
+    // List of all funding fields
+    const fundingFields = [
+      'seedFunding', 'ventureFunding', 'angelFunding', 'debtFinancing',
+      'convertibleNote', 'equityCrowdfunding', 'privateEquity', 'postIpoEquity'
+    ];
+
+    // Prepare update object
+    const update = {};
+    let totalFunding = 0;
+    let fundingRounds = 0;
+
+    // Process each funding field
+    fundingFields.forEach(field => {
+      if (fundingData[field] !== undefined) {
+        const value = parseFloat(fundingData[field]) || 0;
+        update[field] = value;
+        totalFunding += value;
+        fundingRounds++;
+      }
+    });
+
+    // Add calculated fields
+    update.fundingTotalUSD = totalFunding;
+    update.fundingRounds = fundingRounds;
+
+    // Update current funding round if specified
+    if (fundingData.currentFundingRound) {
+      update.currentFundingRound = fundingData.currentFundingRound;
+    }
+
+    // If we have total funding but no breakdown, assign to currentFundingRound
+    if (totalFunding > 0 && fundingRounds === 0) {
+      const currentRound = fundingData.currentFundingRound || 'seedFunding';
+      update[currentRound] = totalFunding;
+      fundingRounds = 1;
+      update.fundingRounds = fundingRounds;
+    }
+
+    const updatedProfile = await BusinessProfileForm.findOneAndUpdate(
+      { user_id },
+      { $set: update },
+      { new: true }
+    );
+
+    if (!updatedProfile) {
+      return res.status(404).json({ success: false, message: 'Business profile not found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: updatedProfile
+    });
+  } catch (error) {
+    console.error('❌ Update business funding error:', error.message, error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update business funding',
+      error: error.message
+    });
+  }
+};
+
+// PATCH: update investment status with enhanced funding handling
 exports.updateStatusByInvestmentId = async (req, res) => {
   const { investment_id, status } = req.body;
 
@@ -93,55 +161,76 @@ exports.updateStatusByInvestmentId = async (req, res) => {
       return res.status(404).json({ success: false, message: "Business profile not found" });
     }
 
-    // 3️⃣ Decide which funding field to increment
+    // 3️⃣ Determine funding field based on currentFundingRound or find next empty
+    let fundingTypeField = profile.currentFundingRound || "seedFunding";
     const fundingSequence = [
       "seedFunding", "angelFunding", "ventureFunding", "convertibleNote",
       "equityCrowdfunding", "debtFinancing", "privateEquity", "postIpoEquity"
     ];
 
-    const currentRoundIndex = profile.fundingRounds || 0;
-    const fundingTypeField = fundingSequence[
-      Math.min(currentRoundIndex, fundingSequence.length - 1)
-    ] || "seedFunding";
-
-    console.log(`✅ fundingTypeField selected: ${fundingTypeField}`);
-
-    // 4️⃣ Build the increment update
-    const update = {};
-
-    if (status === "accepted" && previousStatus !== "accepted") {
-      update.$inc = {
-        fundingTotalUSD: currentContribution,
-        [fundingTypeField]: currentContribution
-      };
-
-      // fundingRounds check
-      const parentInvestment = await Investment.findOne({ _id: investment_id });
-      if (parentInvestment) {
-        const totalRaisedAfter = (parentInvestment.currentContribution || 0) + currentContribution;
-        if (totalRaisedAfter >= parentInvestment.goalAmount) {
-          update.$inc.fundingRounds = 1;
-          console.log(`✅ fundingRounds increment triggered to ${profile.fundingRounds + 1}`);
+    // If no currentFundingRound set, find the first empty field
+    if (!profile.currentFundingRound) {
+      for (const field of fundingSequence) {
+        if (!profile[field] || parseFloat(profile[field]) === 0) {
+          fundingTypeField = field;
+          break;
         }
       }
     }
+
+    console.log(`✅ Selected funding field: ${fundingTypeField}`);
+
+    // 4️⃣ Build the increment update
+    const update = { $set: {} };
+    const inc = {};
+
+    if (status === "accepted" && previousStatus !== "accepted") {
+      inc.fundingTotalUSD = currentContribution;
+      inc[fundingTypeField] = currentContribution;
+
+      // Check if this completes the current funding round
+      const parentInvestment = await Investment.findOne({ _id: investment_id });
+      if (parentInvestment) {
+        const totalRaisedAfter = (parentInvestment.currentContribution || 0) + currentContribution;
+        
+        // Only increment fundingRounds if goal is met and we're not already in a new round
+        if (totalRaisedAfter >= parentInvestment.goalAmount && 
+            fundingTypeField === profile.currentFundingRound) {
+          inc.fundingRounds = 1;
+          
+          // Move to next funding round
+          const currentIndex = fundingSequence.indexOf(fundingTypeField);
+          if (currentIndex < fundingSequence.length - 1) {
+            update.$set.currentFundingRound = fundingSequence[currentIndex + 1];
+          }
+          console.log(`✅ fundingRounds increment triggered to ${profile.fundingRounds + 1}`);
+        }
+      }
+      
+      if (Object.keys(inc).length > 0) {
+        update.$inc = inc;
+      }
+    }
     else if (status === "rejected" && previousStatus === "accepted") {
-      // rollback
+      // rollback - find which funding type was used for this investment
       const investorEntry = investment.investors.find(
         inv => inv.investorId.toString() === investment.investorId.toString()
       );
-      update.$inc = {
+      
+      const rollbackInc = {
         fundingTotalUSD: -currentContribution,
       };
+      
       if (investorEntry && investorEntry.fundingType) {
-        update.$inc[investorEntry.fundingType] = -currentContribution;
+        rollbackInc[investorEntry.fundingType] = -currentContribution;
       }
+      update.$inc = rollbackInc;
       console.log(`✅ Rollback applied:`, update.$inc);
     }
 
-    // 5️⃣ Actually apply update to the BusinessProfileForm
-    if (Object.keys(update).length > 0) {
-      console.log(`🔵 Applying BusinessProfileForm update:`, update.$inc);
+    // 5️⃣ Apply update to the BusinessProfileForm
+    if (Object.keys(update.$set).length > 0 || Object.keys(update.$inc || {}).length > 0) {
+      console.log(`🔵 Applying BusinessProfileForm update:`, update);
 
       const updatedProfile = await BusinessProfileForm.findOneAndUpdate(
         { user_id: businessId },
@@ -153,6 +242,7 @@ exports.updateStatusByInvestmentId = async (req, res) => {
         console.log(`✅ Profile updated:
           fundingTotalUSD=${updatedProfile.fundingTotalUSD}
           fundingRounds=${updatedProfile.fundingRounds}
+          currentFundingRound=${updatedProfile.currentFundingRound}
           ${fundingTypeField}=${updatedProfile[fundingTypeField]}
         `);
       } else {
@@ -160,7 +250,7 @@ exports.updateStatusByInvestmentId = async (req, res) => {
       }
     }
 
-    // 6️⃣ Also update Investment doc itself
+    // 6️⃣ Update Investment doc itself
     const parentInvestment = await Investment.findOne({ _id: investment_id });
     if (parentInvestment) {
       const invUpdate = {};
@@ -175,7 +265,7 @@ exports.updateStatusByInvestmentId = async (req, res) => {
       }
     }
 
-    // 7️⃣ push to MyInvestment investors array
+    // 7️⃣ Update MyInvestment investors array
     if (status === "accepted" && previousStatus !== "accepted") {
       investment.totalRaised += currentContribution;
       investment.interestedCount += 1;
@@ -189,7 +279,7 @@ exports.updateStatusByInvestmentId = async (req, res) => {
       console.log(`✅ MyInvestment investors array updated with fundingType=${fundingTypeField}`);
     }
 
-    // 8️⃣ send notifications
+    // 8️⃣ Send notifications
     const interestedInvestors = await InterestedInvestor.find({ investment_id });
     for (const investor of interestedInvestors) {
       await Notification.create({
@@ -199,7 +289,7 @@ exports.updateStatusByInvestmentId = async (req, res) => {
       });
     }
 
-    // 9️⃣ respond
+    // 9️⃣ Respond
     res.json({
       success: true,
       data: investment
@@ -214,7 +304,6 @@ exports.updateStatusByInvestmentId = async (req, res) => {
     });
   }
 };
-
 
 // GET investment by query param
 exports.getInvestmentById = async (req, res) => {
@@ -297,4 +386,3 @@ exports.getAllMyInvestments = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
